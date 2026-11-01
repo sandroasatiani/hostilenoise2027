@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>source LOST</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+
+  /* sound toggle, top right */
+  #snd {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2;
+    width: 52px; height: 52px; padding: 11px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(10,10,14,0.45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.78); cursor: pointer;
+    transition: transform .25s ease, background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  #snd svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #snd .wave { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round;
+               transition: opacity .3s ease, transform .3s ease; transform-origin: 56px 50px; }
+  #snd .wave:nth-of-type(2) { transition-delay: .05s; }
+  #snd .wave:nth-of-type(3) { transition-delay: .1s; }
+  #snd.off .wave { opacity: 0; transform: scale(0.6); }
+  #snd:hover, #snd:focus-visible {
+    transform: scale(1.08); color: #fff; outline: none;
+    background: rgba(228,40,60,0.18); border-color: rgba(228,40,60,0.7);
+    box-shadow: 0 0 18px rgba(228,40,60,0.45), 0 0 34px rgba(228,40,60,0.2);
+  }
+  #snd:hover svg, #snd:focus-visible svg { filter: drop-shadow(0 0 4px rgba(228,40,60,0.9)); }
+  #snd:not(.off):hover .wave { animation: ping 1.1s ease-in-out infinite; }
+  #snd:not(.off):hover .wave:nth-of-type(2) { animation-delay: .15s; }
+  #snd:not(.off):hover .wave:nth-of-type(3) { animation-delay: .3s; }
+  #snd:active { transform: scale(0.96); }
+  @keyframes ping { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+</style>
+</head>
+<body>
+<button id="snd" class="off" type="button" aria-label="Sound on" aria-pressed="false">
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="currentColor" d="M8 40a9 9 0 0 1 9-9h10l19-19a4 4 0 0 1 7 3v70a4 4 0 0 1-7 3L27 69H17a9 9 0 0 1-9-9z"/>
+    <path class="wave" d="M63 40a13 13 0 0 1 0 20"/>
+    <path class="wave" d="M71 28a28 28 0 0 1 0 44"/>
+    <path class="wave" d="M80 16a44 44 0 0 1 0 68"/>
+  </svg>
+</button>
+<canvas id="c"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  const DRIP_SCALE = 0.28;       // low-res drip buffer; upscaling gives the soft liquid blur
+  const FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+  let W, H, dpr;
+  let layout;                    // text geometry
+  let tint = {};                 // pre-tinted text layers (r, g, b)
+  let textComp, tcCtx;           // per-frame RGB-split composite
+  let frameBuf, fbCtx;           // snapshot of the frame for full-screen glitch slicing
+  let drip, dCtx, dImg, dW, dH;  // drip buffer
+  let bottom, dripTop, dripCx;   // per-column bottom of "LOST" in drip space
+  let dripL, dripR;              // outer columns of the drip curtain
+  let lens;                      // per-column drip length (per frame)
+  let dust;                      // static film dust/scratches
+  const grain = [];              // animated grain frames
+
+  // ---------- helpers ----------
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const smooth = v => { v = clamp(v, 0, 1); return v * v * (3 - 2 * v); };
+
+  // 1D value noise
+  const perm = new Float32Array(512).map(() => Math.random());
+  function noise1(x) {
+    const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+    return perm[i & 511] * (1 - u) + perm[(i + 1) & 511] * u;
+  }
+
+  // ---------- setup ----------
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+
+    // text layout: size "LOST" to a share of the screen width (wider share in portrait),
+    // capped by height so it never crowds a short/wide window
+    const probe = mk(1, 1).getContext('2d');
+    probe.font = `700 100px ${FONT}`;
+    if ('letterSpacing' in probe) probe.letterSpacing = '-0.02em';
+    const lostPer100 = probe.measureText('LOST').width / 100;
+    const targetW = W * (W >= H ? 0.3 : 0.7);
+    const base = Math.min(targetW / lostPer100 / 1.62, H * 0.16);
+    layout = {
+      cx: W / 2,
+      sSize: base,
+      lSize: base * 1.62,
+      sY: H * 0.30,
+      lY: H * 0.30 + base * 1.45,
+    };
+
+    // white text mask (both words) and LOST-only mask
+    const tw = canvas.width, th = canvas.height;
+    const mask = mk(tw, th), m = mask.getContext('2d');
+    const lost = mk(tw, th), l = lost.getContext('2d');
+    for (const c of [m, l]) {
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+      if ('letterSpacing' in c) c.letterSpacing = '-0.02em';
+    }
+    m.font = `700 ${layout.sSize}px ${FONT}`;
+    m.fillText('source', layout.cx, layout.sY);
+    m.font = `700 ${layout.lSize}px ${FONT}`;
+    m.fillText('LOST', layout.cx, layout.lY);
+    l.font = m.font;
+    l.fillText('LOST', layout.cx, layout.lY);
+
+    // bounding box of text (CSS px)
+    m.font = `700 ${layout.lSize}px ${FONT}`;
+    const lw = m.measureText('LOST').width;
+    m.font = `700 ${layout.sSize}px ${FONT}`;
+    const sw = m.measureText('source').width;
+    const bw = Math.max(lw, sw);
+    layout.box = {
+      x: layout.cx - bw / 2 - 20, w: bw + 40,
+      y: layout.sY - layout.sSize * 0.85, h: layout.lY - layout.sY + layout.sSize * 0.95,
+    };
+    layout.lostW = lw;
+
+    // tinted channel layers
+    for (const [k, col] of [['r', '#ff1a1a'], ['g', '#1aff3a'], ['b', '#2a3cff']]) {
+      const c = mk(tw, th), x = c.getContext('2d');
+      x.drawImage(mask, 0, 0);
+      x.globalCompositeOperation = 'source-in';
+      x.fillStyle = col; x.fillRect(0, 0, tw, th);
+      tint[k] = c;
+    }
+    textComp = mk(tw, th); tcCtx = textComp.getContext('2d');
+    frameBuf = mk(tw, th); fbCtx = frameBuf.getContext('2d');
+
+    // drip buffer + bottom edge of LOST per column
+    dW = Math.ceil(W * DRIP_SCALE); dH = Math.ceil(H * DRIP_SCALE);
+    drip = mk(dW, dH); dCtx = drip.getContext('2d');
+    dImg = dCtx.createImageData(dW, dH);
+    bottom = new Int32Array(dW).fill(-1);
+    lens = new Float32Array(dW);
+    const ld = l.getImageData(0, 0, tw, th).data;
+    const yMax = Math.min(th - 1, Math.round((layout.lY + layout.lSize * 0.05) * dpr));
+    // only scan a thin band at the baseline, so drips come from letter feet
+    // (T stem, L foot, O/S bowls), never from the T crossbar or other overhangs
+    const yMin = Math.round((layout.lY - layout.lSize * 0.08) * dpr);
+    dripTop = dH;
+    for (let x = 0; x < dW; x++) {
+      const px = Math.round(((x + 0.5) / DRIP_SCALE) * dpr);
+      if (px >= tw) continue;
+      for (let y = yMax; y >= yMin; y--) {
+        if (ld[(y * tw + px) * 4 + 3] > 120) {
+          bottom[x] = Math.floor((y / dpr) * DRIP_SCALE) - 1;
+          dripTop = Math.min(dripTop, bottom[x]);
+          break;
+        }
+      }
+    }
+    // side falloff is measured against the whole word, so edge letters (L foot, T stem) still drip
+    dripL = (layout.cx - layout.lostW / 2) * DRIP_SCALE;
+    dripR = (layout.cx + layout.lostW / 2) * DRIP_SCALE;
+    dripCx = layout.cx * DRIP_SCALE;
+
+    // grain frames
+    grain.length = 0;
+    for (let i = 0; i < 6; i++) {
+      const g = mk(256, 256), gx = g.getContext('2d'), id = gx.createImageData(256, 256);
+      for (let p = 0; p < id.data.length; p += 4) {
+        const v = Math.random() * 255;
+        id.data[p] = id.data[p + 1] = id.data[p + 2] = v;
+        id.data[p + 3] = Math.random() < 0.5 ? 255 : 0;
+      }
+      gx.putImageData(id, 0, 0);
+      grain.push(ctx.createPattern(g, 'repeat'));
+    }
+
+    // dust, scratches, faint horizontal film lines
+    dust = mk(tw, th);
+    const dx = dust.getContext('2d');
+    dx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (let i = 0; i < W * H / 900; i++) {
+      dx.fillStyle = `rgba(255,255,255,${Math.random() * 0.12})`;
+      const s = Math.random() * 1.6;
+      dx.fillRect(Math.random() * W, Math.random() * H, s, s);
+    }
+    dx.strokeStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 18; i++) {
+      dx.lineWidth = Math.random() * 0.8 + 0.2;
+      dx.beginPath();
+      const x = Math.random() * W, y = Math.random() * H, a = Math.random() * Math.PI * 2, len = 20 + Math.random() * 120;
+      dx.moveTo(x, y); dx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); dx.stroke();
+    }
+    for (let i = 0; i < 6; i++) {
+      dx.fillStyle = `rgba(255,255,255,${0.025 + Math.random() * 0.03})`;
+      dx.fillRect(0, Math.random() * H, W, 1);
+    }
+  }
+
+  // ---------- drips ----------
+  function renderDrips(t) {
+    const data = dImg.data;
+    data.fill(0);
+    const grow = smooth(t / 5);
+    const span = dH - dripTop;
+
+    for (let x = 0; x < dW; x++) {
+      // once grown, every drip runs past the bottom edge of the screen
+      lens[x] = grow * (1.15 + 0.4 * noise1(x * 0.07 + 3.1) + 0.1 * Math.sin(t * 0.6 + x * 0.05));
+    }
+
+    for (let y = Math.max(0, dripTop); y < dH; y++) {
+      const d = (y - dripTop) / span;              // 0 at letters → 1 at bottom of screen
+      const spread = 1 + 2.2 * d * d;              // drips fan out as they fall
+      const wob1 = Math.sin(y * 0.11 + t * 1.4) * 2.5 * d;
+      const wob2 = Math.sin(y * 0.033 - t * 0.7) * 4.5 * d;
+      const row = y * dW * 4;
+
+      for (let x = 0; x < dW; x++) {
+        const sx = dripCx + (x - dripCx) / spread + wob1 * Math.sin(x * 0.07 + t) + wob2;
+        const col = sx | 0;
+        if (col < 0 || col >= dW) continue;
+        const b = bottom[col];
+        if (b < 0 || y < b) continue;
+        const dd = (y - b) / span;
+        const L = lens[col];
+        if (dd > L) continue;
+
+        // long, soft tip fade + side falloff so the curtain dissolves into the background
+        const fade = 1 - smooth((dd - L * 0.75) / (L * 0.25 + 1e-3));
+        // sides soften only as the curtain spreads; right under the letters every foot is full strength
+        const sideRaw = smooth((Math.min(sx - dripL, dripR - sx) + (dripR - dripL) * 0.08) / ((dripR - dripL) * (0.12 + 0.3 * d)));
+        const side = 1 - d + d * sideRaw;
+        const streak = 0.5 + 0.5 * Math.sin(sx * 0.85 + Math.sin(y * 0.06 - t * 2.2) * 2.4);
+        // gathers strength as it falls
+        const v = Math.min(1, fade * side * (0.3 + 0.7 * streak * streak) * (0.7 + 0.7 * d));
+
+        // iridescent hue: shifts with column, depth and time
+        let h = (sx * 5 + y * 2.2 - t * 55 + Math.sin(y * 0.045 + sx * 0.12 + t * 0.8) * 110) % 360;
+        if (h < 0) h += 360;
+        const s = clamp(dd * 4.5, 0, 0.9);       // white-hot near the letters
+        h /= 60;
+        const i = h | 0, f = h - i;
+        const p = v * (1 - s), q = v * (1 - s * f), r2 = v * (1 - s * (1 - f));
+        let R, G, B;
+        switch (i) {
+          case 0: R = v; G = r2; B = p; break;
+          case 1: R = q; G = v; B = p; break;
+          case 2: R = p; G = v; B = r2; break;
+          case 3: R = p; G = q; B = v; break;
+          case 4: R = r2; G = p; B = v; break;
+          default: R = v; G = p; B = q;
+        }
+        const o = row + x * 4;
+        data[o] = R * 255; data[o + 1] = G * 255; data[o + 2] = B * 255; data[o + 3] = 255;
+      }
+    }
+    dCtx.putImageData(dImg, 0, 0);
+  }
+
+  // ---------- glitch state ----------
+  let glitch = 0, strips = [], dashes = [], dashTimer = 0;
+  canvas.addEventListener('pointerdown', () => { glitch = 1.6; });
+
+  function makeStrips() {
+    strips = [];
+    let yy = 0;
+    while (yy < H) {
+      const sh = 2 + Math.random() * 40;
+      strips.push({ y: yy, h: sh, dx: Math.random() < 0.3 ? (Math.random() - 0.5) * 90 * glitch : 0 });
+      yy += sh;
+    }
+  }
+
+  function makeDashes() {
+    dashes = [];
+    const { x, y, w, h } = layout.box;
+    const n = 30 + (glitch * 50 | 0);
+    for (let i = 0; i < n; i++) {
+      // a third hug the text, the rest are scattered across the whole frame
+      const near = Math.random() < 0.35, left = Math.random() < 0.5;
+      const len = 4 + Math.random() * (near ? 50 : 140);
+      dashes.push({
+        x: near ? (left ? x - Math.random() * 40 - len * 0.5 : x + w - Math.random() * 30) : Math.random() * W - len * 0.5,
+        y: near ? y + Math.random() * h : Math.random() * H,
+        w: len,
+        h: Math.random() < 0.8 ? 1 : 2,
+        c: ['#fff', '#ff3040', '#30ffe0', '#40ff60', '#5060ff'][Math.random() * 5 | 0],
+        a: 0.3 + Math.random() * 0.6,
+      });
+    }
+  }
+
+  // ---------- frame ----------
+  let start = performance.now();
+  function frame(now) {
+    const t = (now - start) / 1000;
+
+    if (Math.random() < 0.012) glitch = Math.max(glitch, 0.5 + Math.random() * 0.7);
+    glitch *= 0.9;
+    sound.update(glitch, t);
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#050505';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // drips (behind text)
+    renderDrips(t);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.globalCompositeOperation = 'lighter';
+    // wide halo that bleeds into the background, then the softened body
+    ctx.globalAlpha = 0.55;
+    ctx.filter = `blur(${22 * dpr}px)`;
+    ctx.drawImage(drip, 0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = 0.9;
+    ctx.filter = `blur(${6 * dpr}px)`;
+    ctx.drawImage(drip, 0, 0, canvas.width, canvas.height);
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+
+    // RGB-split text composite
+    const o = (2.5 + 1.5 * Math.sin(t * 2.7) + glitch * 14 + (Math.random() - 0.5) * glitch * 6) * dpr;
+    tcCtx.globalCompositeOperation = 'source-over';
+    tcCtx.clearRect(0, 0, textComp.width, textComp.height);
+    tcCtx.globalCompositeOperation = 'lighter';
+    tcCtx.drawImage(tint.r, -o, -o * 0.35);
+    tcCtx.drawImage(tint.g, o * 0.25, -o * 0.15);
+    tcCtx.drawImage(tint.b, o, o * 0.25);
+    tcCtx.globalAlpha = 0.9;
+    tcCtx.drawImage(tint.r, 0, 0); tcCtx.drawImage(tint.g, 0, 0); tcCtx.drawImage(tint.b, 0, 0);
+    tcCtx.globalAlpha = 1;
+
+    // soft glow
+    ctx.globalAlpha = 0.35;
+    ctx.filter = `blur(${8 * dpr}px)`;
+    ctx.drawImage(textComp, 0, 0);
+    ctx.filter = 'none';
+    // faint ghost above (vertical misregistration)
+    ctx.globalAlpha = 0.18;
+    ctx.drawImage(textComp, 0, -6 * dpr);
+    ctx.globalAlpha = 1;
+
+    ctx.drawImage(textComp, 0, 0);
+
+    // full-frame glitch: slice the whole picture into displaced strips + RGB tear
+    if (glitch > 0.08) {
+      if (Math.random() < 0.5) makeStrips();
+      fbCtx.globalCompositeOperation = 'copy';
+      fbCtx.drawImage(canvas, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#050505';
+      for (const s of strips) {
+        if (!s.dx) continue;
+        const sy = s.y * dpr, sh = s.h * dpr;
+        ctx.fillRect(0, sy, canvas.width, sh);
+        ctx.drawImage(frameBuf, 0, sy, canvas.width, sh, s.dx * dpr, sy, canvas.width, sh);
+        // colour fringe on the torn strip
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.35 * Math.min(1, glitch);
+        ctx.fillStyle = s.dx > 0 ? '#ff1030' : '#10e0ff';
+        ctx.fillRect(s.dx > 0 ? 0 : canvas.width + s.dx * dpr, sy, Math.abs(s.dx) * dpr, sh);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#050505';
+      }
+      ctx.globalCompositeOperation = 'lighter';
+    }
+
+    // glitch dashes flanking the text
+    if (--dashTimer <= 0) { makeDashes(); dashTimer = 3 + Math.random() * 6 | 0; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (const d of dashes) {
+      ctx.globalAlpha = d.a * (0.4 + 0.6 * Math.random());
+      ctx.fillStyle = d.c;
+      ctx.fillRect(d.x + (Math.random() - 0.5) * 3, d.y, d.w, d.h);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    // film dust & scratches
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.8 + Math.random() * 0.2;
+    ctx.drawImage(dust, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
+
+    // rolling scan bar
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const barY = ((t * 60) % (H + 200)) - 100;
+    const g = ctx.createLinearGradient(0, barY - 60, 0, barY + 60);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.025)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, barY - 60, W, 120);
+
+    // grain
+    ctx.setTransform(1, 0, 0, 1, Math.random() * 256, Math.random() * 256);
+    ctx.globalAlpha = 0.07;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = grain[(t * 24 | 0) % grain.length];
+    ctx.fillRect(-256, -256, canvas.width + 512, canvas.height + 512);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // scanlines
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < canvas.height; y += 3 * dpr) ctx.fillRect(0, y, canvas.width, dpr);
+
+    // vignette
+    ctx.globalAlpha = 1;
+    const v = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+                                       canvas.width / 2, canvas.height / 2, canvas.width * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, 'rgba(0,0,0,0.65)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    requestAnimationFrame(frame);
+  }
+
+  // rebuild once per frame at most while the window is being resized
+  // ---------- sound: synthesised in the browser, toggled by the top-right button (or M) ----------
+  function setupSound(build) {
+    const btn = document.getElementById('snd');
+    let ac = null, master = null, voice = null, on = false, nb = null;
+    const kit = {
+      get out() { return master; },
+      noise() {
+        if (!nb) {
+          nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+          const d = nb.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        }
+        return nb;
+      },
+      // dry + synthetic-impulse reverb; returns the input node
+      reverb(seconds, wet) {
+        const len = ac.sampleRate * seconds | 0, ir = ac.createBuffer(2, len, ac.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = ir.getChannelData(ch);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        }
+        const cv = ac.createConvolver(); cv.buffer = ir;
+        const input = ac.createGain();
+        input.connect(master);
+        input.connect(cv).connect(kit.gain(wet, master));
+        return input;
+      },
+      gain(v, dest) { const g = ac.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; },
+      filter(type, freq, q, dest) {
+        const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+        if (dest) f.connect(dest);
+        return f;
+      },
+      osc(type, freq, dest, detune = 0) {
+        const o = ac.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
+        o.connect(dest); o.start();
+        return o;
+      },
+      loopNoise(dest) {
+        const n = ac.createBufferSource(); n.buffer = kit.noise(); n.loop = true;
+        n.connect(dest); n.start();
+        return n;
+      },
+      // one-shot tone gliding f0 -> f1
+      blip(type, f0, f1, dur, vol, dest, attack = 0.004) {
+        const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(dest);
+        o.start(t); o.stop(t + dur + 0.05);
+      },
+      // one-shot filtered noise, filter sweeping f0 -> f1
+      burst(dur, vol, type, f0, f1, q, dest, attack = 0.003) {
+        const t = ac.currentTime, n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+        n.buffer = kit.noise();
+        f.type = type; f.Q.value = q;
+        f.frequency.setValueAtTime(f0, t);
+        f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        n.connect(f).connect(g).connect(dest);
+        n.start(t, Math.random()); n.stop(t + dur + 0.05);
+      },
+    };
+    function toggle() {
+      if (!ac) {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = 0;
+        master.connect(ac.createDynamicsCompressor()).connect(ac.destination);
+        voice = build(ac, kit);
+      }
+      on = !on;
+      if (on) ac.resume();
+      master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, on ? 0.5 : 0.12);
+      btn.classList.toggle('off', !on);
+      btn.setAttribute('aria-pressed', String(on));
+      btn.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
+    }
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('dblclick', e => e.stopPropagation());
+    window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') toggle(); });
+    return {
+      update(...a) { if (on && voice.update) voice.update(...a); },
+      event(name, ...a) { if (on && voice[name]) voice[name](...a); },
+    };
+  }
+
+  // low hum that opens up with every glitch, digital noise stutter, and slow falling
+  // tones for the melting colour drips
+  const sound = setupSound((ac, k) => {
+    const bus = k.reverb(2.5, 0.4);
+    const humF = k.filter('lowpass', 260, 1, k.gain(0.07, bus));
+    for (const [f, d] of [[55, -6], [55, 6], [110, 3], [164.8, -4]]) k.osc('sawtooth', f, humF, d);
+    const gG = k.gain(0, bus);
+    const gF = k.filter('bandpass', 1200, 3, gG);
+    k.loopNoise(gF);
+    let nextDrip = 0;
+    return {
+      update(glitch, t) {
+        const now = ac.currentTime;
+        gG.gain.setTargetAtTime(Math.min(0.35, glitch * 0.22), now, 0.02);
+        if (glitch > 0.15) gF.frequency.setValueAtTime(200 + Math.random() * 5000, now);
+        if (Math.random() < glitch * 0.25) {
+          k.blip('square', 200 + Math.random() * 2400, 60 + Math.random() * 400, 0.04 + Math.random() * 0.08, 0.05, bus);
+        }
+        humF.frequency.setTargetAtTime(260 + glitch * 900, now, 0.05);
+        if (t > nextDrip) {
+          nextDrip = t + 1.2 + Math.random() * 2.2;
+          k.blip('sine', 500 + Math.random() * 700, 90 + Math.random() * 80, 2.5 + Math.random() * 2, 0.05, bus, 0.3);
+        }
+      },
+    };
+  });
+
+  let resizeQueued = false;
+  const queueResize = () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => { resizeQueued = false; resize(); });
+  };
+  window.addEventListener('resize', queueResize);
+  window.addEventListener('orientationchange', queueResize);
+
+  // double-click or "F" toggles true browser fullscreen
+  const toggleFullscreen = () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    else (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  };
+  canvas.addEventListener('dblclick', toggleFullscreen);
+  window.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+  resize();
+  start = performance.now();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOURCE LOST 06</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+
+  /* sound toggle, top right */
+  #snd {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2;
+    width: 52px; height: 52px; padding: 11px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(10,10,14,0.45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.78); cursor: pointer;
+    transition: transform .25s ease, background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  #snd svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #snd .wave { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round;
+               transition: opacity .3s ease, transform .3s ease; transform-origin: 56px 50px; }
+  #snd .wave:nth-of-type(2) { transition-delay: .05s; }
+  #snd .wave:nth-of-type(3) { transition-delay: .1s; }
+  #snd.off .wave { opacity: 0; transform: scale(0.6); }
+  #snd:hover, #snd:focus-visible {
+    transform: scale(1.08); color: #fff; outline: none;
+    background: rgba(255,40,45,0.18); border-color: rgba(255,90,70,0.7);
+    box-shadow: 0 0 18px rgba(255,40,45,0.45), 0 0 34px rgba(70,95,255,0.25);
+  }
+  #snd:hover svg, #snd:focus-visible svg { filter: drop-shadow(0 0 4px rgba(255,120,110,0.9)); }
+  #snd:not(.off):hover .wave { animation: ping 1.1s ease-in-out infinite; }
+  #snd:not(.off):hover .wave:nth-of-type(2) { animation-delay: .15s; }
+  #snd:not(.off):hover .wave:nth-of-type(3) { animation-delay: .3s; }
+  #snd:active { transform: scale(0.96); }
+  @keyframes ping { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<button id="snd" class="off" type="button" aria-label="Sound on" aria-pressed="false">
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="currentColor" d="M8 40a9 9 0 0 1 9-9h10l19-19a4 4 0 0 1 7 3v70a4 4 0 0 1-7 3L27 69H17a9 9 0 0 1-9-9z"/>
+    <path class="wave" d="M63 40a13 13 0 0 1 0 20"/>
+    <path class="wave" d="M71 28a28 28 0 0 1 0 44"/>
+    <path class="wave" d="M80 16a44 44 0 0 1 0 68"/>
+  </svg>
+</button>
+<script>
+(() => {
+  // Long-exposure light painting: red / blue / white light trails swirl through the dark.
+  // Every few seconds the trails are drawn into the hand-lettered SOURCE LOST and scribble
+  // inside the letters until the word glows out of the lines, then they fly apart again.
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+
+  // lettering from text_01.svg (viewBox 0 0 841.9 595.3)
+  const LETTERS = [
+    'M495.5,446.9c-24.3,9.3-53.5-.2-69.6-20.2-5.7-7.5-8.6-16.5-10.5-25.8-1.4-7.8-3.7-17.1.8-23.4,5.8-7.5,26-5.5,30.7,3.1,3.7,5.9,3.8,13.2,7.1,20,3.3,7.1,9.2,12.7,16.7,15.4,11.2,4.3,24.3-.2,28.4-11.5,3.6-9.4,1.2-19.8-4.3-28.3-10-15.7-29.1-24.2-40.2-39.1-8.5-10.8-12.1-24.7-9.8-38.2,3.3-23.9,25.3-39.9,48.3-43.4,19.6-3.1,40.8,4.2,53.9,19.2,6.2,7.5,13.9,20.2,8.8,29.5-5.2,7.6-21.3,8.7-30,4.6-8.7-4-10.2-15.3-16.6-21.6-3.6-3.7-8.9-5.6-14.1-4.6-14.4,3-25.4,21-18,34.7,8,16.2,26.7,22.6,39.8,33.7,10.5,8.4,15.7,21.5,16,34.8,1.3,27.7-10.3,51.2-37.3,60.9h-.2ZM552.7,298c.5,0,.5-2.7.2-2.9-.6-.4-.6,2.7-.2,2.9h0Z',
+    'M255.3,431.8c-14.6-12.3-28.4-30.8-33.7-48.8-5.4-21.1-5.2-44,2.2-64.6,9.4-26.1,31.5-48.3,58.2-56.2,25.5-8.5,50.5-5.9,72.3,10.2,21.4,16,39.4,41.7,43.3,68.5,3.6,30.3-10.8,72.3-33.9,92.3-11.5,10-26.5,14.9-41.4,16.6-24,3.1-48.1-2.5-66.9-17.9h-.2ZM309,423.3c27.4.9,50-22.4,57.6-47.3,4.9-17.4,4.8-37.4-2.9-54.1-7.3-15.9-20.4-30.6-37.8-35-26.1-6.4-57.8,3.4-71.8,27.4-9.4,15.5-11.6,34.3-6.1,51.5,3.8,12.5,9,24.9,17.5,35,10.8,12.6,26.5,22.2,43.3,22.6h.2Z',
+    'M640.4,432.9c-1.3-7.1-.5-14.6-.1-21.9.5-9.2,1.1-18.4,1.2-27.6.4-26.8-1.4-53-1.4-79.8.1-14.7.6-25.7-17.4-26.4-10.9-.3-20.2.8-31.2.3-8.6-.7-19.8,1.8-25.6-4.5-3.7-4-4.1-13.3-.2-17.1,3.3-3.1,7.1-3.4,12.2-3.8,12.3-.5,25-.6,37.5,0,24.9.9,48.9,1,73.7.9,10.3,0,21-.3,31.4.6,3.7.3,7.3.9,10.3,1.9,10,2.9,15.9,15.5,4.9,21.4-7,3.5-14.7,2.5-23,2.4-4.4-.1-8.8-.3-13.3-.4-8.9,0-20.4-1.7-27,4.9-3.6,3.7-5,10.2-5.4,15.5-.5,5.6-.8,11.1-.9,16.8-.6,20.5,2.1,41.9,2.4,62.8.3,14-.5,28.8-1.9,42.9-.7,6.6-1.1,14-4.1,19.8-2.3,4.5-6.2,6.6-10.6,5.2-4.8-1.4-10.6-8.1-11.4-13.6v-.2Z',
+    'M171.2,447.9c-16.1.3-33.7,1.5-49.5,1-12-.2-29.2-2.6-29.5-17.6-.4-6.2.8-12.9,1-19.8.1-8.4-.7-16.7-1-25.1-1.3-29.9-1-59.7.8-89.6,1.6-14-5.9-43,14.7-44.2,13.9.5,14.5,17,14.5,27.9.6,19.5,1.6,39.6,2.7,58.9.7,14.6,1.1,29.4,1,44.1.3,9.5-1.6,21.2,4.6,29,4.6,5.7,12.9,6.9,19.9,7.1,15.1.5,30.3-1.1,45.4.3,6.2.6,12.6,2.7,15.7,8.3,3.5,5.7,1.9,13.7-3.8,17.3-9.1,5.3-25.4,1.6-36.4,2.6h-.2Z',
+    'M492.5,173.4c-3.7-5.2-7.5-10.4-12-14.9-9.6-9.4-21.8-14.3-23.5,2.7-.6,8.1-.1,16.7-.2,24.6,0,6.2.5,12.2-1.1,17.3-3.7,11.3-16,10.5-19.8-.4-2.1-6-1.9-13.2-2.3-19.6-.5-10.4-.6-21.2-1-31.7-.3-9.9-1.1-19.9-1.3-29.8.2-9.3-1.2-20.7,4.9-28.2,4.2-5.2,13.9-6.2,21.3-6,19.5-.4,44.8,4.3,46,27.9,0,8.7-5,17.2-3.4,25.9,1,5.9,4.8,11.1,8.6,15.7,6.4,8,13.3,15.3,19.8,23.1,4.7,5.5,11.7,14.8,5.2,21-3.8,3.5-10,3.8-14.8,2.2-11.7-4.4-18.8-19.7-26.3-29.4v-.2Z',
+    'M243.1,207.4c-36.5,13.9-75.6-11.5-75.2-51.3-.2-18.9,7-37.7,17.9-52.8,6.7-9.4,16.8-16.5,28.3-18,17.9-2,37.4,4.1,50.8,15.9,15,13.9,21,36.5,19.6,56.5-1.7,23.2-20,41.9-41.2,49.6h-.2ZM229.6,185.8c19.6.3,34.4-17.7,33.4-36.8-.4-13.9-9.1-26.9-21-33.8-19.8-11.3-42.3-2.7-48.7,19.5-5.5,16.4-2.9,34.9,12.5,44,7,4.4,15.5,7.1,23.7,7.1h.2Z',
+    'M323.6,87.6c7.4-2.3,15.9-.6,20.2,5.6,4.5,6.7,3.8,15.1,3.9,23.9.5,13.8-1.7,42,13.8,47.4,10.6,2.9,16.3-9.7,17.4-18.4,1.3-8.3,1.1-17.3,1.2-26.1.3-12-.4-22.6,8.1-30.2,5.2-4.5,13.1-4,18.3.5,6.8,5.5,8,15.8,8.3,24.3.3,28.1-2.6,59.7-21.6,81.8-13.9,15.8-37.9,20.8-54.6,6.3-15.3-13.1-20.6-33.5-23.9-52.8-1.4-8.3-2.3-16.4-2.7-24.8-.4-12.9-3.3-32.1,11.4-37.4h.2Z',
+    'M62.6,187.2c-2.1-6.2-1.7-12.9,3-17.3,4.3-4,11.4-5.1,16.7-2.4,7.3,3.7,9.4,14.2,17.6,16.6,11.7,2.7,22.3-9.4,15.1-20.4-4.3-6.8-11.5-10.7-18-15.4-4.7-3.3-9.3-6.9-13-11.3-8.9-9.9-10.1-25-2.6-36,8.8-13.3,28.7-19.4,44.3-16.4,9.9,1.8,17.9,9,22.2,17.9,6,11.8-.3,21-13.1,17-8-2.6-12.2-11.8-20.5-13.2-6.1-.6-10,6-8.8,11.8,1.9,10.9,12.7,16.8,21.2,23.5,12.5,9.1,22.6,23.9,16.7,39.8-9.2,23.5-37.7,37-61.2,25.9-8.8-3.8-16.4-10.7-19.5-19.8v-.2Z',
+    'M762.7,192.7c10,5.6,1.4,14.3-6.5,15.8-7.3,1.8-16.9,1.8-24.9,2.3-8.7.3-18.9,1.1-26.1-.7-17.1-3.6-16.5-22.4-17.8-36.4-.9-12.2-1.1-25-1.1-36.8.4-11.6-1.1-24.7,1.5-35.9,2.8-11.8,15.6-14.4,26.2-14.7,14.4-.2,40.8-4.5,52.5,3,7.7,4.8,6.2,13.1-2.2,15.8-13.1,4.9-31.6-2.6-43.7,5-4.8,3.1-7,9.8-3.3,14.6,9.1,11.8,34,1.6,47.1,9.3,9.5,5.1,8,15.2-1.7,18.6-9.2,3.7-21.5,3.1-31.4,5.1-16,1.8-21.1,20.2-7.9,29.3,11.5,6.6,27.8-.5,39.2,5.6h.1Z',
+    'M614.7,182.1c6.2-4.9,8.3-13.4,14.5-18.2,4.5-3.4,11.2-3.3,15.7.4,10,9.1.7,27.7-8,35.6-13.8,12.2-35.3,13.6-52.6,8-30.6-9.3-48.6-47.5-39.1-77.5,4.4-15.6,16.3-30.4,31.5-37,16.8-7.3,38.4-8.3,54.4,1.3,7.7,4.7,16.4,14,18,22.1,1.9,9.2-7.9,13.4-15.6,9.1-8.9-4.7-15.2-15-26-16.5-11.6-2.2-24.3,3.1-32.5,11.4-8.5,8.5-11.2,20.7-9,33.1,1.5,8.4,5.6,16.3,11.9,21.8,9.4,8.6,25.5,15.2,36.5,6.3h.2Z',
+    'M565.2,144.7c-.8,0,.2-3,.7-3.1,1.1-.2,0,2.9-.6,3h0Z',
+  ];
+  const ART = { x: 60, y: 80, w: 716, h: 372 };   // lettering bounds inside the viewBox
+
+  // light colours: mostly red, then blue, violet and hot white, like the photo
+  const COLORS = [
+    { c: '255,40,45',   w: 0.38 },
+    { c: '255,90,70',   w: 0.12 },
+    { c: '70,95,255',   w: 0.2 },
+    { c: '150,80,255',  w: 0.1 },
+    { c: '215,225,255', w: 0.2 },
+  ];
+  const FADE = 0.045;            // per-frame fade of the exposure (lower = longer trails)
+  const FREE = 5.5, GATHER = 2.2, HOLD = 4.5, RELEASE = 1.8;   // timeline (s)
+  const AMBIENT = 0.22;          // share of lights that never join the word
+
+  let W, H, dpr, trail, tCtx;
+  let mask = [], buckets, bw, bh, BUCKET = 26, unit = 1;
+  let P = [];
+
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+  const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  const pickColor = () => {
+    let r = Math.random();
+    for (let i = 0; i < COLORS.length; i++) { r -= COLORS[i].w; if (r <= 0) return i; }
+    return 0;
+  };
+
+  // ---------- lettering -> sample points (+ buckets for "walk to a nearby point") ----------
+  function buildMask() {
+    const s = Math.min(W * 0.86 / ART.w, H * 0.66 / ART.h);
+    unit = s;
+    const ox = (W - ART.w * s) / 2 - ART.x * s, oy = (H - ART.h * s) / 2 - ART.y * s;
+    const STEP = 3;
+    const c = mk(Math.ceil(W / STEP), Math.ceil(H / STEP)), x = c.getContext('2d');
+    x.setTransform(s / STEP, 0, 0, s / STEP, ox / STEP, oy / STEP);
+    x.fillStyle = '#fff';
+    for (const d of LETTERS) x.fill(new Path2D(d), 'evenodd');
+    const data = x.getImageData(0, 0, c.width, c.height).data;
+    mask = [];
+    for (let j = 0; j < c.height; j++) for (let i = 0; i < c.width; i++) {
+      if (data[(j * c.width + i) * 4 + 3] > 140) mask.push((i + 0.5) * STEP, (j + 0.5) * STEP);
+    }
+    BUCKET = Math.max(14, s * 22);
+    bw = Math.ceil(W / BUCKET); bh = Math.ceil(H / BUCKET);
+    buckets = Array.from({ length: bw * bh }, () => []);
+    for (let k = 0; k < mask.length; k += 2) buckets[(mask[k + 1] / BUCKET | 0) * bw + (mask[k] / BUCKET | 0)].push(k);
+  }
+  const randomTarget = () => (Math.random() * (mask.length / 2) | 0) * 2;
+  function nearbyTarget(k) {
+    const bx = mask[k] / BUCKET | 0, by = mask[k + 1] / BUCKET | 0;
+    for (let tries = 0; tries < 6; tries++) {
+      const xx = bx + (Math.random() * 3 | 0) - 1, yy = by + (Math.random() * 3 | 0) - 1;
+      if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) continue;
+      const b = buckets[yy * bw + xx];
+      if (b.length) return b[Math.random() * b.length | 0];
+    }
+    return k;
+  }
+
+  // ---------- lights ----------
+  function spawn(p) {
+    p.x = rnd(-0.1, 1.1) * W; p.y = rnd(-0.1, 1.1) * H;
+    p.px = p.x; p.py = p.y;
+    p.vx = 0; p.vy = 0;
+    p.life = rnd(4, 12);
+  }
+  function buildLights() {
+    const n = Math.round(Math.min(900, Math.max(260, W * H / 2400)));
+    P = [];
+    for (let i = 0; i < n; i++) {
+      const p = { col: pickColor(), wide: Math.random() < 0.25, ambient: Math.random() < AMBIENT, speed: rnd(0.7, 1.4), seed: rnd(1000), layer: Math.random() * 3 | 0 };
+      spawn(p);
+      p.tgt = randomTarget();
+      P.push(p);
+    }
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    trail = mk(canvas.width, canvas.height); tCtx = trail.getContext('2d');
+    tCtx.fillStyle = '#000'; tCtx.fillRect(0, 0, trail.width, trail.height);
+    buildMask();
+    buildLights();
+  }
+
+  // smooth swirling flow (sum of sines, no seams); three offset layers make crossing streams
+  // instead of every light collapsing into one bundle
+  const LAYERS = [{ dt: 0, sc: 1, rot: 0 }, { dt: 37, sc: 1.35, rot: 2.1 }, { dt: 81, sc: 0.8, rot: 4.2 }];
+  function flowAngle(x, y, t, seed, layer) {
+    const L = LAYERS[layer], s = Math.min(W, H) / L.sc;
+    const u = x / s, v = y / s;
+    t += L.dt;
+    return 2.2 * Math.sin(u * 2.3 + t * 0.19 + Math.sin(v * 1.7 - t * 0.11) * 1.4)
+         + 1.8 * Math.cos(v * 2.9 - t * 0.16 + Math.cos(u * 1.3 + t * 0.07) * 1.2)
+         + 0.9 * Math.sin((u + v) * 5.1 + t * 0.5 + seed * 0.001) + L.rot;
+  }
+
+  // ---------- timeline ----------
+  const CYCLE = FREE + GATHER + HOLD + RELEASE;
+  let clock = 0;
+  function pull() {   // 0: lights roam freely, 1: lights live inside the letters
+    const c = clock % CYCLE;
+    if (c < FREE) return 0;
+    if (c < FREE + GATHER) return smooth((c - FREE) / GATHER);
+    if (c < FREE + GATHER + HOLD) return 1;
+    return 1 - smooth((c - FREE - GATHER - HOLD) / RELEASE);
+  }
+  canvas.addEventListener('pointerdown', () => {
+    const c = clock % CYCLE, base = clock - c;
+    clock = c < FREE ? base + FREE : c < FREE + GATHER + HOLD ? base + FREE + GATHER + HOLD : base + CYCLE;
+  });
+
+  // ---------- frame ----------
+  const groups = COLORS.map(() => [[], []]);   // [thin, wide] segment lists per colour
+  let last = performance.now();
+  function frame(ms) {
+    const dt = Math.min(0.05, (ms - last) / 1000);
+    last = ms;
+    clock += dt;
+    const t = clock;
+    const k = pull();
+    let motion = 0;
+    const f = dt * 60;
+    const base = Math.min(W, H) * 0.0045;
+
+    for (const g of groups) { g[0].length = 0; g[1].length = 0; }
+    for (const p of P) {
+      p.px = p.x; p.py = p.y;
+      const kk = p.ambient ? 0 : k;
+      const a = flowAngle(p.x, p.y, t, p.seed, p.layer);
+      const sp = base * p.speed * (1 + 0.6 * Math.sin(t * 0.7 + p.seed));
+      let ax = Math.cos(a) * sp, ay = Math.sin(a) * sp;
+      if (kk > 0 && mask.length) {
+        // scribble inside the letters: chase a target point, hop to a neighbour on arrival
+        const tx = mask[p.tgt], ty = mask[p.tgt + 1];
+        const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
+        if (d < 3 * unit + 2) p.tgt = nearbyTarget(p.tgt);
+        const pullSp = Math.min(d * 0.12, base * 2.4 * p.speed);
+        ax = ax * (1 - kk) + (dx / d) * pullSp * kk;
+        ay = ay * (1 - kk) + (dy / d) * pullSp * kk;
+      }
+      const damp = 0.86 - 0.1 * k;
+      p.vx = p.vx * damp + ax * (1 - damp);
+      p.vy = p.vy * damp + ay * (1 - damp);
+      p.x += p.vx * f * 6; p.y += p.vy * f * 6;
+      motion += Math.abs(p.vx) + Math.abs(p.vy);
+      p.life -= dt;
+      const out = p.x < -0.15 * W || p.x > 1.15 * W || p.y < -0.15 * H || p.y > 1.15 * H;
+      if (out || (p.life < 0 && kk < 0.05)) { spawn(p); if (!kk) p.tgt = randomTarget(); continue; }
+      groups[p.col][p.wide ? 1 : 0].push(p.px, p.py, p.x, p.y);
+    }
+
+    // exposure: old light fades slowly, new light adds up
+    tCtx.globalCompositeOperation = 'source-over';
+    tCtx.fillStyle = `rgba(0,0,0,${Math.min(1, FADE * f)})`;
+    tCtx.fillRect(0, 0, trail.width, trail.height);
+    tCtx.globalCompositeOperation = 'lighter';
+    tCtx.lineCap = 'round';
+    groups.forEach((g, ci) => {
+      g.forEach((seg, wide) => {
+        if (!seg.length) return;
+        tCtx.lineWidth = (wide ? 2.6 : 1.1) * dpr * Math.max(0.8, unit * 1.2);
+        tCtx.strokeStyle = `rgba(${COLORS[ci].c},${wide ? 0.2 : 0.45})`;
+        tCtx.beginPath();
+        for (let i = 0; i < seg.length; i += 4) {
+          tCtx.moveTo(seg[i] * dpr, seg[i + 1] * dpr);
+          tCtx.lineTo(seg[i + 2] * dpr, seg[i + 3] * dpr);
+        }
+        tCtx.stroke();
+      });
+    });
+
+    // compose: bloom + crisp exposure
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+    ctx.fillStyle = '#030305';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.85;
+    ctx.filter = `contrast(1.25) blur(${12 * dpr}px)`;
+    ctx.drawImage(trail, 0, 0);
+    ctx.globalAlpha = 0.7;
+    ctx.filter = `contrast(1.25) blur(${3 * dpr}px)`;
+    ctx.drawImage(trail, 0, 0);
+    ctx.filter = 'contrast(1.25)';   // also clips the faint residue a slow 8-bit fade never clears
+    ctx.globalAlpha = 1;
+    ctx.drawImage(trail, 0, 0);
+    ctx.filter = 'none';
+
+    // vignette
+    ctx.globalCompositeOperation = 'source-over';
+    const v = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.35,
+                                       canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)');
+    v.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = v;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    sound.update(k, motion / (P.length * base * 1.3 + 1e-6));
+    requestAnimationFrame(frame);
+  }
+
+  let resizeQueued = false;
+  const queueResize = () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => { resizeQueued = false; resize(); });
+  };
+  window.addEventListener('resize', queueResize);
+  window.addEventListener('orientationchange', queueResize);
+
+  const toggleFullscreen = () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    else (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  };
+  canvas.addEventListener('dblclick', toggleFullscreen);
+  window.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+
+  // ---------- sound: a drone that opens up as the lights write the word ----------
+  // all synthesised (Web Audio): low detuned pad, airy noise "whoosh" driven by how fast the
+  // lights move, and a high shimmer chord that rises while SOURCE LOST is written
+  const sound = (() => {
+    let ac = null, master, padFilter, noiseFilter, noiseGain, shimmerGain, on = false;
+    function init() {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0;
+      const comp = ac.createDynamicsCompressor();
+      master.connect(comp).connect(ac.destination);
+
+      // reverb: synthetic decaying impulse
+      const len = ac.sampleRate * 3.5, ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      }
+      const verb = ac.createConvolver(); verb.buffer = ir;
+      const wet = ac.createGain(); wet.gain.value = 0.55;
+      verb.connect(wet).connect(master);
+      const bus = ac.createGain();
+      bus.connect(master); bus.connect(verb);
+
+      // pad: A minor, two detuned saws per note
+      padFilter = ac.createBiquadFilter(); padFilter.type = 'lowpass'; padFilter.frequency.value = 400; padFilter.Q.value = 2;
+      const padGain = ac.createGain(); padGain.gain.value = 0.05;
+      padFilter.connect(padGain).connect(bus);
+      for (const f of [55, 82.41, 110, 130.81]) for (const det of [-7, 7]) {
+        const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+        o.connect(padFilter); o.start();
+      }
+      // slow filter sweep
+      const lfo = ac.createOscillator(), lfoAmt = ac.createGain();
+      lfo.frequency.value = 0.07; lfoAmt.gain.value = 180;
+      lfo.connect(lfoAmt).connect(padFilter.frequency); lfo.start();
+
+      // whoosh: looped noise through a moving band-pass
+      const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
+      for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+      const noise = ac.createBufferSource(); noise.buffer = nb; noise.loop = true;
+      noiseFilter = ac.createBiquadFilter(); noiseFilter.type = 'bandpass'; noiseFilter.frequency.value = 800; noiseFilter.Q.value = 1.2;
+      noiseGain = ac.createGain(); noiseGain.gain.value = 0;
+      noise.connect(noiseFilter).connect(noiseGain).connect(bus); noise.start();
+
+      // shimmer: high chord with tremolo, faded in by the word
+      shimmerGain = ac.createGain(); shimmerGain.gain.value = 0;
+      shimmerGain.connect(bus);
+      [440, 659.25, 880, 1046.5, 1318.5].forEach((f, i) => {
+        const o = ac.createOscillator(); o.type = i % 2 ? 'triangle' : 'sine'; o.frequency.value = f;
+        const g = ac.createGain(); g.gain.value = 0.02;
+        const tr = ac.createOscillator(), ta = ac.createGain();
+        tr.frequency.value = 3 + i * 0.7; ta.gain.value = 0.012;
+        tr.connect(ta).connect(g.gain);
+        o.connect(g).connect(shimmerGain); o.start(); tr.start();
+      });
+    }
+    return {
+      toggle() {
+        if (!ac) init();
+        on = !on;
+        if (on) ac.resume();
+        master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, on ? 0.6 : 0.15);
+        return on;
+      },
+      update(k, motion) {
+        if (!on) return;
+        const now = ac.currentTime;
+        padFilter.frequency.setTargetAtTime(380 + 1600 * k, now, 0.3);
+        noiseFilter.frequency.setTargetAtTime(300 + motion * 900, now, 0.2);
+        noiseGain.gain.setTargetAtTime(0.02 + Math.min(0.12, motion * 0.08) * (1 - 0.5 * k), now, 0.2);
+        shimmerGain.gain.setTargetAtTime(k * k, now, 0.4);
+      },
+    };
+  })();
+  const sndBtn = document.getElementById('snd');
+  const toggleSound = () => {
+    const on = sound.toggle();
+    sndBtn.classList.toggle('off', !on);
+    sndBtn.setAttribute('aria-pressed', String(on));
+    sndBtn.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
+  };
+  sndBtn.addEventListener('click', toggleSound);
+  sndBtn.addEventListener('dblclick', e => e.stopPropagation());
+  window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') toggleSound(); });
+
+  // debug hook: jump the timeline (e.g. window.__seek(8))
+  window.__seek = (s) => { clock = s; };
+
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

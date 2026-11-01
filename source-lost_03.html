@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOURCE LOST 03</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b56c4; overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+
+  /* sound toggle, top right */
+  #snd {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2;
+    width: 52px; height: 52px; padding: 11px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(10,10,14,0.45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.78); cursor: pointer;
+    transition: transform .25s ease, background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  #snd svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #snd .wave { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round;
+               transition: opacity .3s ease, transform .3s ease; transform-origin: 56px 50px; }
+  #snd .wave:nth-of-type(2) { transition-delay: .05s; }
+  #snd .wave:nth-of-type(3) { transition-delay: .1s; }
+  #snd.off .wave { opacity: 0; transform: scale(0.6); }
+  #snd:hover, #snd:focus-visible {
+    transform: scale(1.08); color: #fff; outline: none;
+    background: rgba(208,16,10,0.18); border-color: rgba(208,16,10,0.7);
+    box-shadow: 0 0 18px rgba(208,16,10,0.45), 0 0 34px rgba(208,16,10,0.2);
+  }
+  #snd:hover svg, #snd:focus-visible svg { filter: drop-shadow(0 0 4px rgba(208,16,10,0.9)); }
+  #snd:not(.off):hover .wave { animation: ping 1.1s ease-in-out infinite; }
+  #snd:not(.off):hover .wave:nth-of-type(2) { animation-delay: .15s; }
+  #snd:not(.off):hover .wave:nth-of-type(3) { animation-delay: .3s; }
+  #snd:active { transform: scale(0.96); }
+  @keyframes ping { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<button id="snd" class="off" type="button" aria-label="Sound on" aria-pressed="false">
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="currentColor" d="M8 40a9 9 0 0 1 9-9h10l19-19a4 4 0 0 1 7 3v70a4 4 0 0 1-7 3L27 69H17a9 9 0 0 1-9-9z"/>
+    <path class="wave" d="M63 40a13 13 0 0 1 0 20"/>
+    <path class="wave" d="M71 28a28 28 0 0 1 0 44"/>
+    <path class="wave" d="M80 16a44 44 0 0 1 0 68"/>
+  </svg>
+</button>
+<script type="module">
+import * as THREE from 'three';
+
+const BG = '#1b56c4';
+const RED = new THREE.Color('#d0100a');
+const BLUES = ['#1d58cc', '#1a4fb8', '#2362d8', '#17469f'].map(c => new THREE.Color(c));
+const FONT = "'Arial Black', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const TEXT_COLS = 78;            // grid cells across the widest word
+const MARGIN_X = 14, MARGIN_Y = 11;
+
+const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+const pick = arr => arr[Math.random() * arr.length | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+// cubic-bezier easing (same maths as CSS)
+function cubicBezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = t => ((ax * t + bx) * t + cx) * t;
+  const sy = t => ((ay * t + by) * t + cy) * t;
+  const dsx = t => (3 * ax * t + 2 * bx) * t + cx;
+  return x => {
+    let t = x;
+    for (let i = 0; i < 6; i++) {
+      const d = dsx(t);
+      if (Math.abs(d) < 1e-6) break;
+      t -= (sx(t) - x) / d;
+    }
+    return sy(clamp(t, 0, 1));
+  };
+}
+const EASE = cubicBezier(0.76, 0, 0.18, 1);   // sharp mechanical in-out
+
+// ---------- grid from text ----------
+function buildGrid() {
+  const F = 200;
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  g.font = `900 ${F}px ${FONT}`;
+  const lines = ['SOURCE', 'LOST'];
+  const tw = Math.max(...lines.map(l => g.measureText(l).width));
+  const px = tw / TEXT_COLS;                       // canvas px per cell
+  const lineH = F * 0.86;
+  const textRows = Math.ceil((lineH * lines.length) / px);
+  const cols = TEXT_COLS + MARGIN_X * 2, rows = textRows + MARGIN_Y * 2;
+  c.width = Math.ceil(cols * px); c.height = Math.ceil(rows * px);
+  g.font = `900 ${F}px ${FONT}`;
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  lines.forEach((l, i) => g.fillText(l, c.width / 2, MARGIN_Y * px + F * 0.74 + i * lineH));
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+
+  // 0 empty, 1 letter, 2 surrounding debris
+  const type = new Uint8Array(cols * rows);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const sx = Math.floor((x + 0.5) * px), sy = Math.floor((y + 0.5) * px);
+    if (d[(sy * c.width + sx) * 4 + 3] > 128) type[y * cols + x] = 1;
+  }
+  // debris cloud: blocky clusters inside a ragged ellipse around the words
+  const coarse = new Map();
+  const cr = (x, y) => { const k = x + ',' + y; if (!coarse.has(k)) coarse.set(k, Math.random()); return coarse.get(k); };
+  const cx = cols / 2, cy = rows / 2, rx = TEXT_COLS / 2 + MARGIN_X * 0.75, ry = textRows / 2 + MARGIN_Y * 0.8;
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const i = y * cols + x;
+    if (type[i]) continue;
+    // keep a clean one-cell gap around the letters so their outlines read
+    let nearLetter = false;
+    for (let dy = -1; dy <= 1 && !nearLetter; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < cols && yy < rows && type[yy * cols + xx] === 1) { nearLetter = true; break; }
+    }
+    if (nearLetter) continue;
+    const e = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+    const p = e < 1 ? 1.25 - e * 1.05 : 0;
+    if (cr(x >> 2, y >> 1) * 0.6 + cr(x >> 3, y >> 2) * 0.6 < p) type[i] = 2;
+  }
+  return { cols, rows, type };
+}
+
+// ---------- recursive partition tree ----------
+// Every node is a rectangle of cells. Uniform nodes (all one type) can act as a single
+// moving block; the animation walks up and down this tree, splitting and merging.
+function buildTree(grid) {
+  const { cols, type } = grid;
+  const kind = (x, y, w, h) => {
+    let k = -2;
+    for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) {
+      const t = type[j * cols + i];
+      if (k === -2) k = t; else if (k !== t) return -1;
+    }
+    return k;
+  };
+  const make = (x, y, w, h, parent) => {
+    const n = { x, y, w, h, parent, kind: kind(x, y, w, h), children: null, u: null };
+    if (n.kind === 0) return n;
+    if (n.kind > 0 && (w * h <= 3 || (w < 2 && h < 4) || (h < 2 && w < 4))) return n;
+    let vertical = w > h ? Math.random() < 0.8 : Math.random() < 0.2;
+    if (w < 2) vertical = false;
+    if (h < 2) vertical = true;
+    const len = vertical ? w : h;
+    const cut = clamp(Math.round(len * rnd(0.3, 0.7)), 1, len - 1);
+    n.children = vertical
+      ? [make(x, y, cut, h, n), make(x + cut, y, w - cut, h, n)]
+      : [make(x, y, w, cut, n), make(x, y + cut, w, h - cut, n)];
+    return n;
+  };
+  return make(0, 0, grid.cols, grid.rows, null);
+}
+
+// ---------- three.js scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.Fog(BG, 120, 260);
+
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 1000);
+scene.add(new THREE.HemisphereLight(0xc8d6ff, 0x0a1f55, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 4.2);
+key.position.set(-35, 45, 80);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -70, right: 70, top: 50, bottom: -50, near: 1, far: 250 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.02;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x9fb8ff, 0.6);
+fill.position.set(40, -20, 40);
+scene.add(fill);
+
+const group = new THREE.Group();
+scene.add(group);
+
+const grid = buildGrid();
+const root = buildTree(grid);
+const { cols, rows } = grid;
+
+// cells that get a block
+const cellIdx = new Int32Array(cols * rows).fill(-1);
+const cells = [];
+for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+  const t = grid.type[y * cols + x];
+  if (t) { cellIdx[y * cols + x] = cells.length; cells.push({ x, y, t, node: null }); }
+}
+
+const geo = new THREE.BoxGeometry(1, 1, 1);
+const mat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.0 });
+const mesh = new THREE.InstancedMesh(geo, mat, cells.length);
+mesh.castShadow = mesh.receiveShadow = true;
+mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+group.add(mesh);
+
+// debris colour per finest leaf: mostly blue, some red
+(function paint(n) {
+  if (n.children) return n.children.forEach(paint);
+  if (n.kind === 0) return;
+  const col = n.kind === 1 ? RED : (Math.random() < 0.14 ? RED : pick(BLUES));
+  for (let j = n.y; j < n.y + n.h; j++) for (let i = n.x; i < n.x + n.w; i++) {
+    const k = cellIdx[j * cols + i];
+    if (k >= 0) mesh.setColorAt(k, col);
+  }
+})(root);
+mesh.instanceColor.needsUpdate = true;
+
+// ---------- unit animation state ----------
+const frontier = new Set();
+let now = 0;
+
+function anim(from, to, dur, delay = 0) { return { a: from, b: to, t0: now + delay, dur }; }
+function val(an) { return an.a + (an.b - an.a) * EASE(clamp((now - an.t0) / an.dur, 0, 1)); }
+
+// Timeline: readable word -> breaks apart -> rebuilds into a readable word, on loop
+const HOLD = 3.2, BREAK = 3.6, REBUILD = 2.4;
+const CYCLE = HOLD + BREAK + REBUILD;
+const TEXT_Z = 0, TEXT_D = 3;          // the clean, assembled pose of the letters
+
+function restZ(kind) {
+  return kind === 1 ? pick([-3, -2, -1, -0.5, 0.5, 1, 2, 3, 4])
+                    : pick([-7, -6, -5, -4, -3.5, -3, -2.5, -2, -1.5]);
+}
+function restD(kind) {
+  return kind === 1 ? pick([2, 3, 3.5, 4, 5, 6]) : pick([1, 2, 3, 4, 6]);
+}
+
+// every cell animates on its own, so blocks never jump when the partition changes;
+// cells of one unit just share the same target and timing
+function eachCell(n, fn) {
+  for (let j = n.y; j < n.y + n.h; j++) for (let i = n.x; i < n.x + n.w; i++) {
+    const k = cellIdx[j * cols + i];
+    if (k >= 0) fn(cells[k]);
+  }
+}
+function attach(n) { frontier.add(n); eachCell(n, c => { c.node = n; }); }
+function move(n, z, d, dur, delay = 0) {
+  eachCell(n, c => {
+    c.z = anim(val(c.z), z, dur, delay);
+    if (d !== null) c.d = anim(val(c.d), d, dur, delay);
+  });
+}
+
+// start assembled: the maximal uniform nodes of the tree, letters flat and aligned
+const seeds = [];
+for (const c of cells) { c.z = anim(0, 0, 1); c.d = anim(1, 1, 1); }
+(function seed(n) {
+  if (n.kind > 0) {
+    seeds.push(n);
+    // debris rests well behind the letters' back face
+    n.homeZ = n.kind === 1 ? TEXT_Z : pick([-8, -7, -6, -5, -4.5, -4]);
+    n.homeD = n.kind === 1 ? TEXT_D : restD(2);
+    attach(n);
+    eachCell(n, c => { c.z = anim(n.homeZ, n.homeZ, 1); c.d = anim(n.homeD, n.homeD, 1); });
+  } else if (n.kind === -1) n.children.forEach(seed);
+})(root);
+
+function split(n) {
+  frontier.delete(n);
+  const dur = rnd(0.45, 0.95);
+  for (const ch of n.children) {
+    attach(ch);
+    move(ch, restZ(ch.kind), restD(ch.kind), dur);
+  }
+}
+
+function merge(p) {
+  frontier.delete(p.children[0]); frontier.delete(p.children[1]);
+  attach(p);
+  move(p, restZ(p.kind), restD(p.kind), rnd(0.5, 1));
+}
+
+function piston(n) {
+  move(n, restZ(n.kind), null, rnd(0.4, 0.9));
+}
+
+// one rhythmic burst of splits / merges / pistons, limited to the given kinds
+function beat(strength, kinds, pMerge) {
+  sound.event(strength >= 1 ? 'beat' : 'tick', strength);
+  const list = [...frontier].filter(n => kinds.includes(n.kind));
+  const splittable = list.filter(n => n.children);
+  const mergeable = [];
+  const seen = new Set();
+  for (const n of list) {
+    const p = n.parent;
+    if (!p || seen.has(p) || p.kind <= 0) continue;
+    seen.add(p);
+    if (frontier.has(p.children[0]) && frontier.has(p.children[1])) mergeable.push(p);
+  }
+  const k = Math.round(rnd(6, 14) * strength);
+  for (let i = 0; i < k; i++) {
+    const r = Math.random();
+    if (r < pMerge && mergeable.length) {
+      const p = mergeable.splice(Math.random() * mergeable.length | 0, 1)[0];
+      if (frontier.has(p.children[0]) && frontier.has(p.children[1])) merge(p);
+    } else if (r < 0.85 && splittable.length) {
+      const n = splittable.splice(Math.random() * splittable.length | 0, 1)[0];
+      if (frontier.has(n)) split(n);
+    } else if (list.length) {
+      const n = pick(list);
+      if (frontier.has(n)) piston(n);
+    }
+  }
+}
+
+// snap everything back to the seed monoliths; letters return flat to the front plane,
+// staggered left to right so the word visibly re-forms
+function assemble() {
+  frontier.clear();
+  for (const n of seeds) {
+    attach(n);
+    const stagger = n.kind === 1 ? (n.x / cols) * 0.7 + rnd(0, 0.25) : rnd(0, 0.6);
+    move(n, n.homeZ, n.homeD, rnd(0.9, 1.3), stagger);
+  }
+}
+
+let phase = 'hold', breakBeats = 0;
+function updateTimeline(dt) {
+  const tc = now % CYCLE;
+  const next = tc < HOLD ? 'hold' : tc < HOLD + BREAK ? 'break' : 'rebuild';
+  if (next !== phase) {
+    phase = next;
+    sound.event('phase', phase);
+    if (phase === 'break') { breakBeats = 0; beat(2.5, [1, 2], 0); }
+    if (phase === 'rebuild') assemble();
+  }
+}
+
+// ---------- sliding side bars (horizontal pistons) ----------
+const BARS = 14;
+const barMesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.55 }), BARS);
+barMesh.castShadow = barMesh.receiveShadow = true;
+group.add(barMesh);
+const bars = [];
+for (let i = 0; i < BARS; i++) {
+  const side = i % 2 ? 1 : -1;
+  const b = {
+    side,
+    y: rnd(-rows * 0.32, rows * 0.32),
+    z: rnd(-9, -3.5),
+    len: rnd(5, 11), th: pick([1, 1.5, 2, 3]),
+    x: anim(0, 0, 1),
+  };
+  b.home = side * (TEXT_COLS * 0.5 + rnd(2, 7));
+  b.x = anim(b.home, b.home, 1);
+  bars.push(b);
+  barMesh.setColorAt(i, Math.random() < 0.35 ? RED : pick(BLUES));
+}
+barMesh.instanceColor.needsUpdate = true;
+
+// ---------- frame ----------
+const m4 = new THREE.Matrix4(), pos = new THREE.Vector3(), quat = new THREE.Quaternion(), scl = new THREE.Vector3();
+const ox = cols / 2, oy = rows / 2;
+let lastBeat = 0, startT = performance.now();
+
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  // fit the words with breathing room, in either orientation
+  const fitW = TEXT_COLS * (w < h ? 1.08 : 1.22), fitH = (rows - MARGIN_Y * 2) * 1.75;
+  const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const dist = Math.max(fitH / 2 / tanV, fitW / 2 / (tanV * camera.aspect));
+  camera.position.set(0, 0, dist);
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+  scene.fog.near = dist * 0.9; scene.fog.far = dist * 2.2;
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------- sound: synthesised in the browser, toggled by the top-right button (or M) ----------
+function setupSound(build) {
+  const btn = document.getElementById('snd');
+  let ac = null, master = null, voice = null, on = false, nb = null;
+  const kit = {
+    get out() { return master; },
+    noise() {
+      if (!nb) {
+        nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+        const d = nb.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      return nb;
+    },
+    // dry + synthetic-impulse reverb; returns the input node
+    reverb(seconds, wet) {
+      const len = ac.sampleRate * seconds | 0, ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+      }
+      const cv = ac.createConvolver(); cv.buffer = ir;
+      const input = ac.createGain();
+      input.connect(master);
+      input.connect(cv).connect(kit.gain(wet, master));
+      return input;
+    },
+    gain(v, dest) { const g = ac.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; },
+    filter(type, freq, q, dest) {
+      const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+      if (dest) f.connect(dest);
+      return f;
+    },
+    osc(type, freq, dest, detune = 0) {
+      const o = ac.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
+      o.connect(dest); o.start();
+      return o;
+    },
+    loopNoise(dest) {
+      const n = ac.createBufferSource(); n.buffer = kit.noise(); n.loop = true;
+      n.connect(dest); n.start();
+      return n;
+    },
+    // one-shot tone gliding f0 -> f1
+    blip(type, f0, f1, dur, vol, dest, attack = 0.004) {
+      const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(dest);
+      o.start(t); o.stop(t + dur + 0.05);
+    },
+    // one-shot filtered noise, filter sweeping f0 -> f1
+    burst(dur, vol, type, f0, f1, q, dest, attack = 0.003) {
+      const t = ac.currentTime, n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      n.buffer = kit.noise();
+      f.type = type; f.Q.value = q;
+      f.frequency.setValueAtTime(f0, t);
+      f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      n.connect(f).connect(g).connect(dest);
+      n.start(t, Math.random()); n.stop(t + dur + 0.05);
+    },
+  };
+  function toggle() {
+    if (!ac) {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain(); master.gain.value = 0;
+      master.connect(ac.createDynamicsCompressor()).connect(ac.destination);
+      voice = build(ac, kit);
+    }
+    on = !on;
+    if (on) ac.resume();
+    master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, on ? 0.5 : 0.12);
+    btn.classList.toggle('off', !on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
+  }
+  btn.addEventListener('click', toggle);
+  btn.addEventListener('dblclick', e => e.stopPropagation());
+  window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') toggle(); });
+  return {
+    update(...a) { if (on && voice.update) voice.update(...a); },
+    event(name, ...a) { if (on && voice[name]) voice[name](...a); },
+  };
+}
+
+// mechanical: every fracture beat is a thud + click, debris ticks quietly, the break
+// drops a boom, the rebuild sweeps up and locks into a chord
+const sound = setupSound((ac, k) => {
+  const bus = k.reverb(2.2, 0.35);
+  const padF = k.filter('lowpass', 500, 0.7, k.gain(0.045, bus));
+  for (const [f, d] of [[73.4, -5], [73.4, 5], [110, 0], [146.8, 3]]) k.osc('sawtooth', f, padF, d);
+  return {
+    beat(strength) {
+      k.blip('sine', 150, 42, 0.35, Math.min(0.5, 0.16 * strength), bus);
+      k.burst(0.04, Math.min(0.3, 0.08 * strength), 'highpass', 2500, 2500, 0.7, bus);
+      k.blip('triangle', 500 + Math.random() * 900, 250, 0.07, 0.05, bus);
+    },
+    tick() {
+      k.blip('triangle', 900 + Math.random() * 1200, 500, 0.05, 0.025, bus);
+    },
+    phase(p) {
+      const now = ac.currentTime;
+      if (p === 'break') {
+        k.blip('sine', 80, 28, 1.4, 0.6, bus);
+        padF.frequency.setTargetAtTime(1500, now, 0.4);
+      } else if (p === 'rebuild') {
+        k.burst(1.8, 0.12, 'bandpass', 300, 5000, 2, bus, 1.4);
+        padF.frequency.setTargetAtTime(800, now, 0.6);
+      } else {
+        for (const f of [293.7, 440, 587.3, 880]) k.blip('sine', f, f, 3, 0.05, bus, 0.01);
+        padF.frequency.setTargetAtTime(500, now, 0.8);
+      }
+    },
+  };
+});
+
+// click: break the word apart right now (or hit harder if it is already breaking)
+renderer.domElement.addEventListener('pointerdown', () => {
+  if (phase === 'break') return beat(3, [1, 2], 0.1);
+  startT = performance.now() - (Math.floor(now / CYCLE) * CYCLE + HOLD) * 1000;
+});
+const toggleFullscreen = () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  else (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+};
+renderer.domElement.addEventListener('dblclick', toggleFullscreen);
+addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+
+function frame(ms) {
+  now = (ms - startT) / 1000;
+
+  updateTimeline();
+
+  // rhythmic beats: letters fracture only during the break phase,
+  // the debris around them keeps a quieter pulse the whole time
+  if (phase === 'break' && now - lastBeat > 0.36) {
+    lastBeat = now;
+    const p = ((now % CYCLE) - HOLD) / BREAK;
+    beat(1 + p, [1, 2], p < 0.6 ? 0.15 : 0.4);
+  } else if (phase !== 'break' && now - lastBeat > 0.6) {
+    lastBeat = now;
+    beat(0.4, [2], 0.5);
+  }
+
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i];
+    const d = val(c.d), z = val(c.z);
+    pos.set(c.x - ox + 0.5, oy - c.y - 0.5, z - d / 2);
+    scl.set(1, 1, d);
+    m4.compose(pos, quat, scl);
+    mesh.setMatrixAt(i, m4);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+
+  for (let i = 0; i < BARS; i++) {
+    const b = bars[i];
+    if (now - b.x.t0 > b.x.dur + rnd(0.2, 1.5) && Math.random() < 0.03) {
+      b.x = anim(val(b.x), b.home + b.side * pick([-4, 0, 3, 6, 10]), rnd(0.5, 1));
+    }
+    pos.set(val(b.x), b.y, b.z);
+    scl.set(b.len, b.th, b.th);
+    m4.compose(pos, quat, scl);
+    barMesh.setMatrixAt(i, m4);
+  }
+  barMesh.instanceMatrix.needsUpdate = true;
+
+  // slow camera-like sway to reveal depth
+  group.rotation.y = Math.sin(now * 0.23) * 0.14;
+  group.rotation.x = Math.sin(now * 0.17) * 0.05 - 0.03;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

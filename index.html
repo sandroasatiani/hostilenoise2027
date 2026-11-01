@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOURCE LOST — HostileNoise 2027</title>
+<style>
+  :root {
+    --bg: #050506;
+    --fg: #f2f2f4;
+    --muted: rgba(242,242,244,0.5);
+    --line: rgba(255,255,255,0.1);
+    --red: #ff2a3a;
+    --cyan: #30ffe0;
+    --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); }
+  body { min-height: 100vh; padding: clamp(24px, 5vw, 64px) clamp(16px, 4vw, 56px) 48px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 32px;
+           border-bottom: 1px solid var(--line); padding-bottom: clamp(16px, 2.5vw, 28px); margin-bottom: clamp(24px, 4vw, 48px); }
+  h1 { margin: 0; font-size: clamp(40px, 8vw, 104px); font-weight: 900; letter-spacing: -0.02em; line-height: 0.9;
+       text-shadow: -2px 0 rgba(255,42,58,0.75), 2px 0 rgba(48,255,224,0.6); }
+  header p { margin: 0; font: 12px/1.6 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+
+  .grid { display: grid; gap: clamp(20px, 3vw, 36px); grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+
+  .card { display: block; color: inherit; text-decoration: none; outline: none; }
+  .shot { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 6px; background: #111;
+          border: 1px solid var(--line); transition: border-color .3s ease, box-shadow .3s ease, transform .3s ease; }
+  .shot img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2,.7,.2,1), filter .3s ease; }
+  /* glitch slices: copies of the screenshot shifted in red / cyan, shown on hover */
+  .shot::before, .shot::after { content: ''; position: absolute; inset: 0; background: var(--img) center / cover;
+          opacity: 0; mix-blend-mode: screen; pointer-events: none; }
+  .shot::before { filter: url(#red); }
+  .shot::after { filter: url(#cyan); }
+  .num { position: absolute; left: 10px; top: 10px; z-index: 1; font: 11px var(--mono); letter-spacing: 0.1em;
+         padding: 4px 7px; border-radius: 3px; background: rgba(0,0,0,0.55); color: var(--fg); }
+  .play { position: absolute; right: 12px; bottom: 12px; z-index: 1; width: 44px; height: 44px; border-radius: 50%;
+          display: grid; place-items: center; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.25);
+          opacity: 0; transform: translateY(6px); transition: opacity .25s ease, transform .25s ease; }
+  .play svg { width: 16px; height: 16px; margin-left: 3px; fill: #fff; }
+
+  .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 14px 2px 0; }
+  .name { font-size: clamp(18px, 1.6vw, 22px); font-weight: 700; letter-spacing: 0.01em; transition: color .25s ease; }
+  .tag { font: 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: right; }
+
+  .card:hover .shot, .card:focus-visible .shot {
+    border-color: rgba(255,42,58,0.6); transform: translateY(-3px);
+    box-shadow: 0 10px 40px rgba(255,42,58,0.18), 0 0 0 1px rgba(48,255,224,0.15);
+  }
+  .card:hover .shot img, .card:focus-visible .shot img { transform: scale(1.05); }
+  .card:hover .shot::before, .card:focus-visible .shot::before { animation: slice-r .9s steps(1) infinite; }
+  .card:hover .shot::after, .card:focus-visible .shot::after { animation: slice-c .9s steps(1) infinite; }
+  .card:hover .play, .card:focus-visible .play { opacity: 1; transform: none; }
+  .card:hover .name, .card:focus-visible .name { color: #fff; text-shadow: -1px 0 var(--red), 1px 0 var(--cyan); }
+  .card:focus-visible .shot { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+  @keyframes slice-r {
+    0%   { opacity: .55; transform: translate(-6px, 0); clip-path: inset(12% 0 70% 0); }
+    25%  { opacity: .45; transform: translate(5px, 0);  clip-path: inset(58% 0 25% 0); }
+    50%  { opacity: 0; }
+    70%  { opacity: .5;  transform: translate(-4px, 0); clip-path: inset(80% 0 6% 0); }
+  }
+  @keyframes slice-c {
+    0%   { opacity: 0; }
+    15%  { opacity: .5;  transform: translate(6px, 0);  clip-path: inset(34% 0 50% 0); }
+    45%  { opacity: .45; transform: translate(-5px, 0); clip-path: inset(5% 0 82% 0); }
+    75%  { opacity: 0; }
+    85%  { opacity: .5;  transform: translate(3px, 0);  clip-path: inset(66% 0 20% 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card:hover .shot::before, .card:hover .shot::after { animation: none; }
+    .shot, .shot img, .play { transition: none; }
+  }
+
+  footer { margin-top: clamp(32px, 5vw, 64px); font: 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="red"><feColorMatrix type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0"/></filter>
+  <filter id="cyan"><feColorMatrix type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0"/></filter>
+</svg>
+
+<header>
+  <h1>SOURCE LOST</h1>
+  <p>HostileNoise 2027 · 6 variations</p>
+</header>
+
+<main class="grid" id="grid"></main>
+
+<footer>Click to open · F or double-click for fullscreen · M toggles sound</footer>
+
+<script>
+  const VARIANTS = [
+    { file: 'source-lost_01.html', name: 'Chroma Melt',       tag: 'RGB glitch · drips' },
+    { file: 'source-lost_02.html', name: 'Dead Channel',      tag: 'pixel-sort signal' },
+    { file: 'source-lost_03.html', name: 'Monolith Fracture', tag: '3D blocks · WebGL' },
+    { file: 'source-lost_04.html', name: 'Halftone Drift',    tag: 'dot field · WebGL' },
+    { file: 'source-lost_05.html', name: 'Phosphor Trace',    tag: 'XY oscilloscope' },
+    { file: 'source-lost_06.html', name: 'Light Scrawl',      tag: 'long-exposure light' },
+  ];
+  const grid = document.getElementById('grid');
+  VARIANTS.forEach((v, i) => {
+    const n = String(i + 1).padStart(2, '0');
+    const thumb = `thumbs/${v.file.replace('.html', '.jpg')}`;
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = v.file;
+    a.setAttribute('aria-label', `${n} ${v.name} — open`);
+    a.innerHTML = `
+      <div class="shot" style="--img:url('${thumb}')">
+        <img src="${thumb}" alt="" loading="lazy" width="800" height="450">
+        <span class="num">${n}</span>
+        <span class="play"><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M0 0l10 6-10 6z"/></svg></span>
+      </div>
+      <div class="meta"><span class="name">${v.name}</span><span class="tag">${v.tag}</span></div>`;
+    grid.appendChild(a);
+  });
+</script>
+</body>
+</html>

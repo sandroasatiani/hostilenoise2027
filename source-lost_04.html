@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOURCE LOST 04</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+  #gl { cursor: crosshair; touch-action: none; }
+
+  /* sound toggle, top right */
+  #snd {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2;
+    width: 52px; height: 52px; padding: 11px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(10,10,14,0.45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.78); cursor: pointer;
+    transition: transform .25s ease, background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  #snd svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #snd .wave { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round;
+               transition: opacity .3s ease, transform .3s ease; transform-origin: 56px 50px; }
+  #snd .wave:nth-of-type(2) { transition-delay: .05s; }
+  #snd .wave:nth-of-type(3) { transition-delay: .1s; }
+  #snd.off .wave { opacity: 0; transform: scale(0.6); }
+  #snd:hover, #snd:focus-visible {
+    transform: scale(1.08); color: #fff; outline: none;
+    background: rgba(40,200,255,0.18); border-color: rgba(40,200,255,0.7);
+    box-shadow: 0 0 18px rgba(40,200,255,0.45), 0 0 34px rgba(40,200,255,0.2);
+  }
+  #snd:hover svg, #snd:focus-visible svg { filter: drop-shadow(0 0 4px rgba(40,200,255,0.9)); }
+  #snd:not(.off):hover .wave { animation: ping 1.1s ease-in-out infinite; }
+  #snd:not(.off):hover .wave:nth-of-type(2) { animation-delay: .15s; }
+  #snd:not(.off):hover .wave:nth-of-type(3) { animation-delay: .3s; }
+  #snd:active { transform: scale(0.96); }
+  @keyframes ping { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+</style>
+</head>
+<body>
+<button id="snd" class="off" type="button" aria-label="Sound on" aria-pressed="false">
+  <svg viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="currentColor" d="M8 40a9 9 0 0 1 9-9h10l19-19a4 4 0 0 1 7 3v70a4 4 0 0 1-7 3L27 69H17a9 9 0 0 1-9-9z"/>
+    <path class="wave" d="M63 40a13 13 0 0 1 0 20"/>
+    <path class="wave" d="M71 28a28 28 0 0 1 0 44"/>
+    <path class="wave" d="M80 16a44 44 0 0 1 0 68"/>
+  </svg>
+</button>
+<canvas id="gl"></canvas>
+<script>
+(() => {
+  const glc = document.getElementById('gl');
+  const tc = document.createElement('canvas');   // offscreen: the word, uploaded as a texture
+  const tctx = tc.getContext('2d');
+  const gl = glc.getContext('webgl2', { antialias: false, premultipliedAlpha: false });
+  const DOT_PX = 7;              // dot spacing in CSS pixels
+  const CYCLE = 12;              // seconds: empty -> dots gather into the lettering -> hold -> dissolve
+  const FORM_IN = [1.5, 4.2], FORM_OUT = [9, 11.4];
+  // lettering from text_01.svg (viewBox 0 0 841.9 595.3)
+  const LETTERS = [
+    'M495.5,446.9c-24.3,9.3-53.5-.2-69.6-20.2-5.7-7.5-8.6-16.5-10.5-25.8-1.4-7.8-3.7-17.1.8-23.4,5.8-7.5,26-5.5,30.7,3.1,3.7,5.9,3.8,13.2,7.1,20,3.3,7.1,9.2,12.7,16.7,15.4,11.2,4.3,24.3-.2,28.4-11.5,3.6-9.4,1.2-19.8-4.3-28.3-10-15.7-29.1-24.2-40.2-39.1-8.5-10.8-12.1-24.7-9.8-38.2,3.3-23.9,25.3-39.9,48.3-43.4,19.6-3.1,40.8,4.2,53.9,19.2,6.2,7.5,13.9,20.2,8.8,29.5-5.2,7.6-21.3,8.7-30,4.6-8.7-4-10.2-15.3-16.6-21.6-3.6-3.7-8.9-5.6-14.1-4.6-14.4,3-25.4,21-18,34.7,8,16.2,26.7,22.6,39.8,33.7,10.5,8.4,15.7,21.5,16,34.8,1.3,27.7-10.3,51.2-37.3,60.9h-.2ZM552.7,298c.5,0,.5-2.7.2-2.9-.6-.4-.6,2.7-.2,2.9h0Z',
+    'M255.3,431.8c-14.6-12.3-28.4-30.8-33.7-48.8-5.4-21.1-5.2-44,2.2-64.6,9.4-26.1,31.5-48.3,58.2-56.2,25.5-8.5,50.5-5.9,72.3,10.2,21.4,16,39.4,41.7,43.3,68.5,3.6,30.3-10.8,72.3-33.9,92.3-11.5,10-26.5,14.9-41.4,16.6-24,3.1-48.1-2.5-66.9-17.9h-.2ZM309,423.3c27.4.9,50-22.4,57.6-47.3,4.9-17.4,4.8-37.4-2.9-54.1-7.3-15.9-20.4-30.6-37.8-35-26.1-6.4-57.8,3.4-71.8,27.4-9.4,15.5-11.6,34.3-6.1,51.5,3.8,12.5,9,24.9,17.5,35,10.8,12.6,26.5,22.2,43.3,22.6h.2Z',
+    'M640.4,432.9c-1.3-7.1-.5-14.6-.1-21.9.5-9.2,1.1-18.4,1.2-27.6.4-26.8-1.4-53-1.4-79.8.1-14.7.6-25.7-17.4-26.4-10.9-.3-20.2.8-31.2.3-8.6-.7-19.8,1.8-25.6-4.5-3.7-4-4.1-13.3-.2-17.1,3.3-3.1,7.1-3.4,12.2-3.8,12.3-.5,25-.6,37.5,0,24.9.9,48.9,1,73.7.9,10.3,0,21-.3,31.4.6,3.7.3,7.3.9,10.3,1.9,10,2.9,15.9,15.5,4.9,21.4-7,3.5-14.7,2.5-23,2.4-4.4-.1-8.8-.3-13.3-.4-8.9,0-20.4-1.7-27,4.9-3.6,3.7-5,10.2-5.4,15.5-.5,5.6-.8,11.1-.9,16.8-.6,20.5,2.1,41.9,2.4,62.8.3,14-.5,28.8-1.9,42.9-.7,6.6-1.1,14-4.1,19.8-2.3,4.5-6.2,6.6-10.6,5.2-4.8-1.4-10.6-8.1-11.4-13.6v-.2Z',
+    'M171.2,447.9c-16.1.3-33.7,1.5-49.5,1-12-.2-29.2-2.6-29.5-17.6-.4-6.2.8-12.9,1-19.8.1-8.4-.7-16.7-1-25.1-1.3-29.9-1-59.7.8-89.6,1.6-14-5.9-43,14.7-44.2,13.9.5,14.5,17,14.5,27.9.6,19.5,1.6,39.6,2.7,58.9.7,14.6,1.1,29.4,1,44.1.3,9.5-1.6,21.2,4.6,29,4.6,5.7,12.9,6.9,19.9,7.1,15.1.5,30.3-1.1,45.4.3,6.2.6,12.6,2.7,15.7,8.3,3.5,5.7,1.9,13.7-3.8,17.3-9.1,5.3-25.4,1.6-36.4,2.6h-.2Z',
+    'M492.5,173.4c-3.7-5.2-7.5-10.4-12-14.9-9.6-9.4-21.8-14.3-23.5,2.7-.6,8.1-.1,16.7-.2,24.6,0,6.2.5,12.2-1.1,17.3-3.7,11.3-16,10.5-19.8-.4-2.1-6-1.9-13.2-2.3-19.6-.5-10.4-.6-21.2-1-31.7-.3-9.9-1.1-19.9-1.3-29.8.2-9.3-1.2-20.7,4.9-28.2,4.2-5.2,13.9-6.2,21.3-6,19.5-.4,44.8,4.3,46,27.9,0,8.7-5,17.2-3.4,25.9,1,5.9,4.8,11.1,8.6,15.7,6.4,8,13.3,15.3,19.8,23.1,4.7,5.5,11.7,14.8,5.2,21-3.8,3.5-10,3.8-14.8,2.2-11.7-4.4-18.8-19.7-26.3-29.4v-.2Z',
+    'M243.1,207.4c-36.5,13.9-75.6-11.5-75.2-51.3-.2-18.9,7-37.7,17.9-52.8,6.7-9.4,16.8-16.5,28.3-18,17.9-2,37.4,4.1,50.8,15.9,15,13.9,21,36.5,19.6,56.5-1.7,23.2-20,41.9-41.2,49.6h-.2ZM229.6,185.8c19.6.3,34.4-17.7,33.4-36.8-.4-13.9-9.1-26.9-21-33.8-19.8-11.3-42.3-2.7-48.7,19.5-5.5,16.4-2.9,34.9,12.5,44,7,4.4,15.5,7.1,23.7,7.1h.2Z',
+    'M323.6,87.6c7.4-2.3,15.9-.6,20.2,5.6,4.5,6.7,3.8,15.1,3.9,23.9.5,13.8-1.7,42,13.8,47.4,10.6,2.9,16.3-9.7,17.4-18.4,1.3-8.3,1.1-17.3,1.2-26.1.3-12-.4-22.6,8.1-30.2,5.2-4.5,13.1-4,18.3.5,6.8,5.5,8,15.8,8.3,24.3.3,28.1-2.6,59.7-21.6,81.8-13.9,15.8-37.9,20.8-54.6,6.3-15.3-13.1-20.6-33.5-23.9-52.8-1.4-8.3-2.3-16.4-2.7-24.8-.4-12.9-3.3-32.1,11.4-37.4h.2Z',
+    'M62.6,187.2c-2.1-6.2-1.7-12.9,3-17.3,4.3-4,11.4-5.1,16.7-2.4,7.3,3.7,9.4,14.2,17.6,16.6,11.7,2.7,22.3-9.4,15.1-20.4-4.3-6.8-11.5-10.7-18-15.4-4.7-3.3-9.3-6.9-13-11.3-8.9-9.9-10.1-25-2.6-36,8.8-13.3,28.7-19.4,44.3-16.4,9.9,1.8,17.9,9,22.2,17.9,6,11.8-.3,21-13.1,17-8-2.6-12.2-11.8-20.5-13.2-6.1-.6-10,6-8.8,11.8,1.9,10.9,12.7,16.8,21.2,23.5,12.5,9.1,22.6,23.9,16.7,39.8-9.2,23.5-37.7,37-61.2,25.9-8.8-3.8-16.4-10.7-19.5-19.8v-.2Z',
+    'M762.7,192.7c10,5.6,1.4,14.3-6.5,15.8-7.3,1.8-16.9,1.8-24.9,2.3-8.7.3-18.9,1.1-26.1-.7-17.1-3.6-16.5-22.4-17.8-36.4-.9-12.2-1.1-25-1.1-36.8.4-11.6-1.1-24.7,1.5-35.9,2.8-11.8,15.6-14.4,26.2-14.7,14.4-.2,40.8-4.5,52.5,3,7.7,4.8,6.2,13.1-2.2,15.8-13.1,4.9-31.6-2.6-43.7,5-4.8,3.1-7,9.8-3.3,14.6,9.1,11.8,34,1.6,47.1,9.3,9.5,5.1,8,15.2-1.7,18.6-9.2,3.7-21.5,3.1-31.4,5.1-16,1.8-21.1,20.2-7.9,29.3,11.5,6.6,27.8-.5,39.2,5.6h.1Z',
+    'M614.7,182.1c6.2-4.9,8.3-13.4,14.5-18.2,4.5-3.4,11.2-3.3,15.7.4,10,9.1.7,27.7-8,35.6-13.8,12.2-35.3,13.6-52.6,8-30.6-9.3-48.6-47.5-39.1-77.5,4.4-15.6,16.3-30.4,31.5-37,16.8-7.3,38.4-8.3,54.4,1.3,7.7,4.7,16.4,14,18,22.1,1.9,9.2-7.9,13.4-15.6,9.1-8.9-4.7-15.2-15-26-16.5-11.6-2.2-24.3,3.1-32.5,11.4-8.5,8.5-11.2,20.7-9,33.1,1.5,8.4,5.6,16.3,11.9,21.8,9.4,8.6,25.5,15.2,36.5,6.3h.2Z',
+    'M565.2,144.7c-.8,0,.2-3,.7-3.1,1.1-.2,0,2.9-.6,3h0Z',
+  ];
+  const ART = { x: 60, y: 80, w: 716, h: 372 };   // lettering bounds inside the viewBox
+
+  if (!gl) {
+    document.body.innerHTML = '<p style="color:#fff;font:16px sans-serif;padding:16px">WebGL2 is not available in this browser.</p>';
+    return;
+  }
+
+  const VERT = `#version 300 es
+  in vec2 pos;
+  void main() { gl_Position = vec4(pos, 0.0, 1.0); }`;
+
+  // Halftone field: a warped dot lattice over a twisting "surface".
+  // Dot size follows a wobbling ring band; a soft dark hole in the middle holds the lettering,
+  // which is drawn by the dots themselves: each dot joins or leaves it on its own threshold.
+  const FRAG = `#version 300 es
+  precision highp float;
+  uniform vec2 uRes;
+  uniform float uTime, uDens, uPulse, uForm;
+  uniform vec2 uHole;            // hole half-size in height-normalised units
+  uniform sampler2D uText;       // white word on black, screen-sized
+  out vec4 outColor;
+
+  mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+
+  vec3 palette(float t) {
+    vec3 c0 = vec3(0.10, 0.92, 1.00);   // cyan
+    vec3 c1 = vec3(0.10, 0.30, 1.00);   // blue
+    vec3 c2 = vec3(0.42, 0.12, 1.00);   // violet
+    vec3 c3 = vec3(1.00, 0.10, 0.90);   // magenta
+    vec3 c4 = vec3(1.00, 0.06, 0.22);   // red
+    vec3 c5 = vec3(1.00, 0.52, 0.08);   // orange
+    t = clamp(t, 0.0, 1.0) * 5.0;
+    if (t < 1.0) return mix(c0, c1, t);
+    if (t < 2.0) return mix(c1, c2, t - 1.0);
+    if (t < 3.0) return mix(c2, c3, t - 2.0);
+    if (t < 4.0) return mix(c3, c4, t - 3.0);
+    return mix(c4, c5, t - 4.0);
+  }
+
+  void main() {
+    vec2 p = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
+    float t = uTime;
+    float r = length(p);
+    float a = atan(p.y, p.x);
+
+    // swirl: inner area twists more, slowly breathing
+    float sw = 0.9 * exp(-r * 1.4) * sin(t * 0.27) + 0.45 * sin(r * 2.6 - t * 0.45);
+    vec2 q = rot(sw) * p;
+
+    // surface height of the folded sheet
+    // (only whole multiples of the angle, or sin/cos of it, so there is no seam where atan wraps)
+    float h = sin(q.x * 2.6 + t * 0.55 + sin(q.y * 2.1 - t * 0.37) * 1.6)
+            * cos(q.y * 2.2 - t * 0.31 + 0.8 * sin(a));
+
+    float hr = length(p / uHole);
+    float hole = mix(1.0, smoothstep(0.75, 1.45, hr), uForm);
+
+    // perspective-ish compression where the sheet bends away
+    vec2 g = q * (1.0 + 0.32 * h) * uDens;
+    g = rot(0.7854) * g;                 // 45° halftone screen
+    vec2 cell = fract(g) - 0.5;
+    vec2 cid = floor(g);
+
+    // dots stretch into ellipses along the fold
+    vec2 e = rot(h * 1.3 + 0.6 * sin(a)) * cell;
+    e.x *= 1.0 + 0.55 * abs(h);
+    float d = length(e);
+
+    // intensity: wobbling ring band, never fully empty, dark hole for the text
+    float R = 0.62 + 0.12 * sin(a * 2.0 + t * 0.5) + 0.07 * sin(a * 3.0 - t * 0.7);
+    float band = exp(-pow((r - R) / 0.42, 2.0));
+    float I = (0.12 + 0.88 * hole) * (0.22 + 0.78 * band) * (0.35 + 0.65 * (0.5 + 0.5 * h));
+    I *= 1.0 + 0.08 * uPulse;
+
+    // the word lives inside the structure: sampled through the same moving fold,
+    // like a reflection on the dotted surface
+    vec2 suv = gl_FragCoord.xy / uRes;
+    suv += vec2(h * 0.006 + sin(q.y * 7.0 + t * 0.9) * 0.0025,
+                sin(q.x * 6.0 - t * 0.8) * 0.004) * vec2(uRes.y / uRes.x, 1.0);
+    float tx = texture(uText, suv).r;
+    float glow = textureLod(uText, suv, 4.5).r * uForm;
+
+    // whole dots switch into / out of the lettering: random per dot, plus a soft diagonal sweep
+    float rnd = fract(sin(dot(cid, vec2(127.1, 311.7))) * 43758.5453);
+    float sweep = 0.5 + 0.5 * sin(p.x * 2.4 + p.y * 1.3 + 1.0);
+    float thr = 0.1 + 0.8 * (0.7 * rnd + 0.3 * sweep);
+    tx *= smoothstep(thr - 0.05, thr + 0.05, uForm);
+    I = mix(I, 0.95 + 0.05 * h, tx);
+
+    float rad = 0.5 * sqrt(clamp(I, 0.0, 1.0)) + 0.07 * tx;
+    float aa = fwidth(d) * 0.75;
+    float dotMask = 1.0 - smoothstep(rad - aa, rad + aa, d);
+
+    // colour sweeps diagonally (cyan top-left -> orange bottom-right), swirled with the sheet
+    // normalise to the screen's own extents so the full gradient fits any aspect ratio
+    vec2 qs = q / vec2(0.5 * uRes.x / uRes.y, 0.5);
+    float ct = 0.5 + dot(qs, normalize(vec2(1.0, -1.0))) * 0.42
+             + 0.12 * sin(t * 0.21 + r * 3.0) + 0.05 * h;
+    vec3 col = palette(ct) * (0.45 + 0.75 * I);
+    // letters: near-white dots carrying a tint of the surface colour they sit on
+    col = mix(col, mix(palette(ct), vec3(1.0), 0.72) * (1.05 + 0.1 * h), tx);
+    // hot core of each dot
+    col += 0.18 * smoothstep(rad * 0.6, 0.0, d) * I;
+
+    // soft sheen of the word spilling onto neighbouring dots
+    col += palette(ct + 0.15) * glow * 0.35 * (1.0 - tx);
+    outColor = vec4(col * dotMask, 1.0);
+  }`;
+
+  function shader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, shader(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, FRAG));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, 'pos');
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {};
+  for (const n of ['uRes', 'uTime', 'uDens', 'uHole', 'uPulse', 'uForm']) U[n] = gl.getUniformLocation(prog, n);
+
+  // ---------- text texture ----------
+  const tex = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.uniform1i(gl.getUniformLocation(prog, 'uText'), 0);
+
+  let W, H, dpr;
+  function buildText() {
+    const s = Math.min(W * 0.74 / ART.w, H * 0.58 / ART.h);
+    const w = ART.w * s, h = ART.h * s, pad = Math.min(W, H) * 0.06;
+    // darker zone around the lettering so it reads through the dots
+    gl.uniform2f(U.uHole, (w * 0.5 + pad) / H, (h * 0.5 + pad) / H);
+
+    tctx.setTransform(1, 0, 0, 1, 0, 0);
+    tctx.fillStyle = '#000';
+    tctx.fillRect(0, 0, tc.width, tc.height);
+    tctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ((W - w) / 2 - ART.x * s), dpr * ((H - h) / 2 - ART.y * s));
+    tctx.fillStyle = '#fff';
+    for (const d of LETTERS) tctx.fill(new Path2D(d), 'evenodd');
+
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, tc);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    for (const c of [glc, tc]) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+    gl.viewport(0, 0, glc.width, glc.height);
+    gl.uniform2f(U.uRes, glc.width, glc.height);
+    gl.uniform1f(U.uDens, H / DOT_PX);
+    buildText();
+  }
+
+  // ---------- sound: synthesised in the browser, toggled by the top-right button (or M) ----------
+  function setupSound(build) {
+    const btn = document.getElementById('snd');
+    let ac = null, master = null, voice = null, on = false, nb = null;
+    const kit = {
+      get out() { return master; },
+      noise() {
+        if (!nb) {
+          nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+          const d = nb.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        }
+        return nb;
+      },
+      // dry + synthetic-impulse reverb; returns the input node
+      reverb(seconds, wet) {
+        const len = ac.sampleRate * seconds | 0, ir = ac.createBuffer(2, len, ac.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = ir.getChannelData(ch);
+          for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        }
+        const cv = ac.createConvolver(); cv.buffer = ir;
+        const input = ac.createGain();
+        input.connect(master);
+        input.connect(cv).connect(kit.gain(wet, master));
+        return input;
+      },
+      gain(v, dest) { const g = ac.createGain(); g.gain.value = v; if (dest) g.connect(dest); return g; },
+      filter(type, freq, q, dest) {
+        const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+        if (dest) f.connect(dest);
+        return f;
+      },
+      osc(type, freq, dest, detune = 0) {
+        const o = ac.createOscillator(); o.type = type; o.frequency.value = freq; o.detune.value = detune;
+        o.connect(dest); o.start();
+        return o;
+      },
+      loopNoise(dest) {
+        const n = ac.createBufferSource(); n.buffer = kit.noise(); n.loop = true;
+        n.connect(dest); n.start();
+        return n;
+      },
+      // one-shot tone gliding f0 -> f1
+      blip(type, f0, f1, dur, vol, dest, attack = 0.004) {
+        const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(f0, t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(dest);
+        o.start(t); o.stop(t + dur + 0.05);
+      },
+      // one-shot filtered noise, filter sweeping f0 -> f1
+      burst(dur, vol, type, f0, f1, q, dest, attack = 0.003) {
+        const t = ac.currentTime, n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+        n.buffer = kit.noise();
+        f.type = type; f.Q.value = q;
+        f.frequency.setValueAtTime(f0, t);
+        f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        n.connect(f).connect(g).connect(dest);
+        n.start(t, Math.random()); n.stop(t + dur + 0.05);
+      },
+    };
+    function toggle() {
+      if (!ac) {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        master = ac.createGain(); master.gain.value = 0;
+        master.connect(ac.createDynamicsCompressor()).connect(ac.destination);
+        voice = build(ac, kit);
+      }
+      on = !on;
+      if (on) ac.resume();
+      master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, on ? 0.5 : 0.12);
+      btn.classList.toggle('off', !on);
+      btn.setAttribute('aria-pressed', String(on));
+      btn.setAttribute('aria-label', on ? 'Sound off' : 'Sound on');
+    }
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('dblclick', e => e.stopPropagation());
+    window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') toggle(); });
+    return {
+      update(...a) { if (on && voice.update) voice.update(...a); },
+      event(name, ...a) { if (on && voice[name]) voice[name](...a); },
+    };
+  }
+
+  // slow breathing chord that follows the halftone pulse; a click rings like a bell and
+  // sends a wave of air through the pattern
+  const sound = setupSound((ac, k) => {
+    const bus = k.reverb(4, 0.6);
+    const padF = k.filter('lowpass', 600, 1, k.gain(0.05, bus));
+    for (const [f, d] of [[82.4, -4], [123.5, 4], [164.8, -3], [185, 5], [246.9, 0]]) k.osc(d ? 'sawtooth' : 'triangle', f, padF, d);
+    const airG = k.gain(0.008, bus);
+    const airF = k.filter('bandpass', 2500, 0.7, airG);
+    k.loopNoise(airF);
+    return {
+      update(pulse) {
+        const now = ac.currentTime;
+        padF.frequency.setTargetAtTime(420 + 520 * Math.min(pulse, 2), now, 0.1);
+        airG.gain.setTargetAtTime(0.006 + 0.01 * Math.min(pulse, 3), now, 0.1);
+      },
+      ripple() {
+        k.blip('sine', 1318.5, 1318.5, 3, 0.06, bus);
+        k.blip('sine', 1975.5, 1975.5, 2.4, 0.035, bus);
+        k.blip('sine', 82.4, 80, 3, 0.18, bus, 0.05);
+        k.burst(1.2, 0.08, 'bandpass', 400, 6000, 1.5, bus, 0.3);
+      },
+    };
+  });
+
+  let resizeQueued = false;
+  const queueResize = () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => { resizeQueued = false; resize(); });
+  };
+  window.addEventListener('resize', queueResize);
+  window.addEventListener('orientationchange', queueResize);
+
+  const toggleFullscreen = () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    else (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+  };
+  glc.addEventListener('dblclick', toggleFullscreen);
+  window.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+
+  // timeline: how much of the lettering the dots are drawing right now
+  const ease = x => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+  let clock = 0;
+  function formAt(c) {
+    if (c < FORM_IN[0]) return 0;
+    if (c < FORM_IN[1]) return ease((c - FORM_IN[0]) / (FORM_IN[1] - FORM_IN[0]));
+    if (c < FORM_OUT[0]) return 1;
+    return 1 - ease((c - FORM_OUT[0]) / (FORM_OUT[1] - FORM_OUT[0]));
+  }
+
+  // click: a pulse ripples through the dots, and the lettering gathers (or dissolves) right away
+  let pulseAt = -10;
+  glc.addEventListener('pointerdown', () => {
+    pulseAt = performance.now() / 1000;
+    sound.event('ripple');
+    const c = clock % CYCLE, target = formAt(c) < 0.5 ? FORM_IN[0] : FORM_OUT[0];
+    clock += (target - c + CYCLE) % CYCLE;
+  });
+
+  // debug hook: jump the timeline (e.g. window.__seek(6))
+  window.__seek = (v) => { clock = v; };
+
+  resize();
+  const start = performance.now();
+  let last = start;
+  function frame(ms) {
+    const t = (ms - start) / 1000;
+    clock += Math.min(0.05, (ms - last) / 1000);
+    last = ms;
+    gl.uniform1f(U.uForm, formAt(clock % CYCLE));
+    const pulse = Math.exp(-((ms / 1000) - pulseAt) * 2.5) * 4 + (0.5 + 0.5 * Math.sin(t * 1.1));
+    gl.uniform1f(U.uTime, t);
+    gl.uniform1f(U.uPulse, pulse);
+    sound.update(pulse);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
