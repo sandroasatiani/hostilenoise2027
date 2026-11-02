@@ -34,6 +34,71 @@
   #snd:not(.off):hover .wave:nth-of-type(3) { animation-delay: .3s; }
   #snd:active { transform: scale(0.96); }
   @keyframes ping { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  @font-face { font-family: '16 Questions'; font-weight: 200; font-display: swap; src: url(fonts/16QuestionsV1-ExtraLight.woff2) format('woff2'); }
+  @font-face { font-family: '16 Questions'; font-weight: 300; font-display: swap; src: url(fonts/16QuestionsV1-Light.woff2) format('woff2'); }
+  @font-face { font-family: '16 Questions'; font-weight: 400; font-display: swap; src: url(fonts/16QuestionsV1-Regular.woff2) format('woff2'); }
+  @font-face { font-family: '16 Questions'; font-weight: 700; font-display: swap; src: url(fonts/16QuestionsV1-Bold.woff2) format('woff2'); }
+  @font-face { font-family: '16 Questions'; font-weight: 900; font-display: swap; src: url(fonts/16QuestionsV1-Black.woff2) format('woff2'); }
+
+  /* tools: burger next to the sound toggle, panel drops down below */
+  #menu, #shot {
+    position: fixed; top: max(16px, env(safe-area-inset-top)); right: calc(max(16px, env(safe-area-inset-right)) + 62px); z-index: 2;
+    width: 52px; height: 52px; padding: 15px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.18); background: rgba(10,10,14,0.45);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    color: rgba(255,255,255,0.78); cursor: pointer;
+    transition: transform .25s ease, background .25s ease, border-color .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+  #menu svg, #shot svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  #menu line { stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; transition: transform .3s ease, opacity .2s ease; transform-origin: 11px 11px; }
+  #menu[aria-expanded="true"] .l1 { transform: translateY(6px) rotate(45deg); }
+  #menu[aria-expanded="true"] .l2 { opacity: 0; transform: scaleX(0.2); }
+  #menu[aria-expanded="true"] .l3 { transform: translateY(-6px) rotate(-45deg); }
+  #menu:hover, #menu:focus-visible, #menu[aria-expanded="true"], #shot:hover, #shot:focus-visible {
+    color: #fff; outline: none; background: rgba(255,40,45,0.18); border-color: rgba(255,90,70,0.7);
+    box-shadow: 0 0 18px rgba(255,40,45,0.45), 0 0 34px rgba(70,95,255,0.25);
+  }
+  #menu:hover, #menu:focus-visible, #shot:hover, #shot:focus-visible { transform: scale(1.08); }
+  #menu:active, #shot:active { transform: scale(0.96); }
+  #shot { right: calc(max(16px, env(safe-area-inset-right)) + 124px); padding: 13px; }
+  #shot svg * { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; }
+  #shot:hover .lens, #shot:focus-visible .lens { animation: focus 1s ease-in-out infinite; transform-origin: 12px 13px; }
+  @keyframes focus { 50% { transform: scale(0.75); } }
+  #flash { position: fixed; inset: 0; z-index: 3; background: #fff; opacity: 0; pointer-events: none; }
+  #flash.on { animation: flash .45s ease-out; }
+  @keyframes flash { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+
+  #panel {
+    position: fixed; z-index: 2; top: calc(max(16px, env(safe-area-inset-top)) + 64px); right: max(16px, env(safe-area-inset-right));
+    width: min(300px, calc(100vw - 32px)); max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - 80px); overflow-y: auto;
+    padding: 6px 16px 16px; border-radius: 14px; box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,0.14); background: rgba(10,10,14,0.74);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    color: rgba(255,255,255,0.86); font: 12px/1.4 -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    transform-origin: top right; transition: opacity .25s ease, transform .25s ease, visibility .25s;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.2) transparent;
+  }
+  #panel[hidden] { display: block; visibility: hidden; opacity: 0; transform: translateY(-8px) scale(0.98); pointer-events: none; }
+  #panel .row[hidden] { display: none; }
+  #panel h3 { margin: 14px 0 8px; font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
+  #panel .row { margin: 0 0 10px; }
+  #panel .lab { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  #panel .lab output { font: 11px ui-monospace, Menlo, monospace; color: rgba(255,255,255,0.55); }
+  #panel input[type=range] { width: 100%; margin: 0; accent-color: #ff2a3a; cursor: pointer; }
+  #panel textarea, #panel select {
+    width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.4); color: #fff; padding: 8px 10px; font-size: 13px;
+  }
+  #panel textarea { resize: vertical; min-height: 56px; font: 700 20px/1.15 '16 Questions', sans-serif; }
+  #panel textarea:focus, #panel select:focus { outline: none; border-color: rgba(255,90,70,0.7); }
+  #panel textarea::placeholder { color: rgba(255,255,255,0.3); }
+  #panel .color { display: flex; align-items: center; gap: 10px; }
+  #panel input[type=color] { width: 40px; height: 28px; padding: 0; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: none; cursor: pointer; }
+  #panel .color output { font: 11px ui-monospace, Menlo, monospace; color: rgba(255,255,255,0.55); }
+  #panel .reset { width: 100%; margin-top: 8px; padding: 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18);
+                  background: none; color: rgba(255,255,255,0.75); font: inherit; cursor: pointer; }
+  #panel .reset:hover { border-color: rgba(255,90,70,0.7); color: #fff; }
 </style>
 </head>
 <body>
@@ -46,6 +111,52 @@
     <path class="wave" d="M80 16a44 44 0 0 1 0 68"/>
   </svg>
 </button>
+<button id="menu" type="button" aria-label="Tools" aria-expanded="false" aria-controls="panel">
+  <svg viewBox="0 0 22 22" aria-hidden="true">
+    <line class="l1" x1="2" y1="5" x2="20" y2="5"/>
+    <line class="l2" x1="2" y1="11" x2="20" y2="11"/>
+    <line class="l3" x1="2" y1="17" x2="20" y2="17"/>
+  </svg>
+</button>
+<button id="shot" type="button" aria-label="Save screenshot" title="Save screenshot (P)">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M3 8.5A2 2 0 0 1 5 6.5h2.4l1.6-2.5h6l1.6 2.5H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <circle class="lens" cx="12" cy="13" r="3.6"/>
+  </svg>
+</button>
+<div id="flash"></div>
+<div id="panel" hidden>
+  <h3>Text</h3>
+  <div class="row"><textarea data-k="text" rows="2" spellcheck="false" aria-label="Your text" placeholder="Type your own text…"></textarea></div>
+  <div class="row"><div class="lab"><span>Weight</span></div>
+    <select data-k="weight">
+      <option value="200">ExtraLight</option><option value="300">Light</option><option value="400">Regular</option>
+      <option value="700">Bold</option><option value="900">Black</option>
+    </select></div>
+  <div class="row"><div class="lab"><span>Smooth</span><output></output></div><input type="range" data-k="smooth" min="0" max="1" step="0.01"></div>
+  <div class="row"><div class="lab"><span>Letter spacing</span><output></output></div><input type="range" data-k="spacing" min="-0.1" max="0.6" step="0.01"></div>
+
+  <h3>Background</h3>
+  <div class="row color"><input type="color" data-k="bg" aria-label="Background colour"><output></output></div>
+
+  <h3>Lines</h3>
+  <div class="row"><div class="lab"><span>Colours</span></div>
+    <select data-k="palette">
+      <option value="photo">Red · blue (photo)</option><option value="fire">Fire</option><option value="ice">Ice</option>
+      <option value="neon">Neon</option><option value="mono">White</option><option value="custom">Custom</option>
+    </select></div>
+  <div class="row color" data-show="custom"><input type="color" data-k="custom" aria-label="Line colour"><output></output></div>
+  <div class="row"><div class="lab"><span>Intensity</span><output></output></div><input type="range" data-k="intensity" min="0.2" max="3" step="0.05"></div>
+  <div class="row"><div class="lab"><span>Thickness</span><output></output></div><input type="range" data-k="thickness" min="0.3" max="4" step="0.05"></div>
+  <div class="row"><div class="lab"><span>Density</span><output></output></div><input type="range" data-k="density" min="0.3" max="2.5" step="0.05"></div>
+  <div class="row"><div class="lab"><span>Trail length</span><output></output></div><input type="range" data-k="trail" min="0.3" max="4" step="0.05"></div>
+  <div class="row"><div class="lab"><span>Glow</span><output></output></div><input type="range" data-k="glow" min="0" max="2.5" step="0.05"></div>
+
+  <h3>Motion</h3>
+  <div class="row"><div class="lab"><span>Speed</span><output></output></div><input type="range" data-k="speed" min="0.1" max="3" step="0.05"></div>
+
+  <button type="button" class="reset">Reset to defaults</button>
+</div>
 <script>
 (() => {
   // Long-exposure light painting: red / blue / white light trails swirl through the dark.
@@ -70,14 +181,28 @@
   ];
   const ART = { x: 60, y: 80, w: 716, h: 372 };   // lettering bounds inside the viewBox
 
-  // light colours: mostly red, then blue, violet and hot white, like the photo
-  const COLORS = [
-    { c: '255,40,45',   w: 0.38 },
-    { c: '255,90,70',   w: 0.12 },
-    { c: '70,95,255',   w: 0.2 },
-    { c: '150,80,255',  w: 0.1 },
-    { c: '215,225,255', w: 0.2 },
-  ];
+  // light colours; "photo" is mostly red, then blue, violet and hot white, like the photo
+  const PALETTES = {
+    photo: [['255,40,45', 0.38], ['255,90,70', 0.12], ['70,95,255', 0.2], ['150,80,255', 0.1], ['215,225,255', 0.2]],
+    fire:  [['255,50,20', 0.35], ['255,120,30', 0.3], ['255,200,110', 0.2], ['255,30,70', 0.15]],
+    ice:   [['60,130,255', 0.35], ['110,210,255', 0.3], ['200,235,255', 0.2], ['110,80,255', 0.15]],
+    neon:  [['255,40,200', 0.3], ['40,255,220', 0.3], ['255,235,60', 0.15], ['120,80,255', 0.25]],
+    mono:  [['255,255,255', 0.6], ['190,200,225', 0.4]],
+  };
+  let COLORS = [];
+
+  // tool panel settings (kept per viewer in localStorage); an empty text shows the drawing
+  const DEFAULTS = {
+    text: '', weight: 700, smooth: 0, spacing: 0,
+    bg: '#000000', palette: 'photo', custom: '#ff2a3a',
+    intensity: 1, thickness: 1, density: 1, trail: 1, glow: 1, speed: 1,
+  };
+  const STORE = 'source-lost-06-v2';
+  const S = { ...DEFAULTS };
+  try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) {}
+  const ownText = () => S.text.trim() !== '';
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
+
   const FADE = 0.045;            // per-frame fade of the exposure (lower = longer trails)
   const FREE = 5.5, GATHER = 2.2, HOLD = 4.5, RELEASE = 1.8;   // timeline (s)
   const AMBIENT = 0.22;          // share of lights that never join the word
@@ -96,25 +221,90 @@
   };
 
   // ---------- lettering -> sample points (+ buckets for "walk to a nearby point") ----------
+  const fontOf = (px) => `${S.weight} ${px}px "16 Questions"`;
+
+  // typed text, centred and fitted into the same box as the image; returns the font size in px
+  function drawText(x, STEP) {
+    const lines = S.text.split('\n'), REF = 100, LH = 1.08;
+    x.font = fontOf(REF); x.letterSpacing = `${S.spacing * REF}px`;
+    let w = 0, asc = 0, desc = 0;
+    for (const l of lines) {
+      const m = x.measureText(l);
+      w = Math.max(w, m.width); asc = Math.max(asc, m.actualBoundingBoxAscent); desc = Math.max(desc, m.actualBoundingBoxDescent);
+    }
+    const h = (lines.length - 1) * LH * REF + asc + desc;
+    if (!w || !h) return REF;
+    const k = Math.min(W * 0.86 / w, H * 0.66 / h), px = REF * k / STEP;
+    x.font = fontOf(px); x.letterSpacing = `${S.spacing * px}px`;
+    x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+    const top = (H - h * k) / 2 / STEP + asc * k / STEP;
+    lines.forEach((l, i) => x.fillText(l, x.canvas.width / 2 + S.spacing * px / 2, top + i * LH * px));
+    return REF * k;
+  }
+
+  // separable box blur (3 passes ~ gaussian) on an alpha field, used by SMOOTH
+  function boxBlur(a, w, h, r) {
+    const tmp = new Float32Array(a.length), n = 2 * r + 1;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let j = 0; j < h; j++) {
+        const row = j * w;
+        let sum = 0;
+        for (let i = -r; i <= r; i++) sum += a[row + Math.min(w - 1, Math.max(0, i))];
+        for (let i = 0; i < w; i++) {
+          tmp[row + i] = sum / n;
+          sum += a[row + Math.min(w - 1, i + r + 1)] - a[row + Math.max(0, i - r)];
+        }
+      }
+      for (let i = 0; i < w; i++) {
+        let sum = 0;
+        for (let j = -r; j <= r; j++) sum += tmp[Math.min(h - 1, Math.max(0, j)) * w + i];
+        for (let j = 0; j < h; j++) {
+          a[j * w + i] = sum / n;
+          sum += tmp[Math.min(h - 1, j + r + 1) * w + i] - tmp[Math.max(0, j - r) * w + i];
+        }
+      }
+    }
+  }
+
   function buildMask() {
     const s = Math.min(W * 0.86 / ART.w, H * 0.66 / ART.h);
     unit = s;
-    const ox = (W - ART.w * s) / 2 - ART.x * s, oy = (H - ART.h * s) / 2 - ART.y * s;
     const STEP = 3;
-    const c = mk(Math.ceil(W / STEP), Math.ceil(H / STEP)), x = c.getContext('2d');
-    x.setTransform(s / STEP, 0, 0, s / STEP, ox / STEP, oy / STEP);
+    const c = mk(Math.ceil(W / STEP), Math.ceil(H / STEP)), x = c.getContext('2d', { willReadFrequently: true });
     x.fillStyle = '#fff';
-    for (const d of LETTERS) x.fill(new Path2D(d), 'evenodd');
-    const data = x.getImageData(0, 0, c.width, c.height).data;
+    let em;   // letter size in px: sets how far SMOOTH rounds the shapes
+    if (ownText()) em = drawText(x, STEP);
+    else {
+      const ox = (W - ART.w * s) / 2 - ART.x * s, oy = (H - ART.h * s) / 2 - ART.y * s;
+      x.setTransform(s / STEP, 0, 0, s / STEP, ox / STEP, oy / STEP);
+      for (const d of LETTERS) x.fill(new Path2D(d), 'evenodd');
+      em = 125 * s;
+    }
+    const n = c.width * c.height, data = x.getImageData(0, 0, c.width, c.height).data;
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) a[i] = data[i * 4 + 3];
+    // smooth: blur then threshold at the middle = corners and joins melt into round shapes
+    const r = Math.round(S.smooth * em * 0.1 / STEP);
+    if (r > 0) boxBlur(a, c.width, c.height, r);
+    const thr = r > 0 ? 115 : 140;
     mask = [];
     for (let j = 0; j < c.height; j++) for (let i = 0; i < c.width; i++) {
-      if (data[(j * c.width + i) * 4 + 3] > 140) mask.push((i + 0.5) * STEP, (j + 0.5) * STEP);
+      if (a[j * c.width + i] > thr) mask.push((i + 0.5) * STEP, (j + 0.5) * STEP);
     }
     BUCKET = Math.max(14, s * 22);
     bw = Math.ceil(W / BUCKET); bh = Math.ceil(H / BUCKET);
     buckets = Array.from({ length: bw * bh }, () => []);
     for (let k = 0; k < mask.length; k += 2) buckets[(mask[k + 1] / BUCKET | 0) * bw + (mask[k] / BUCKET | 0)].push(k);
+    for (const p of P) p.tgt = randomTarget();
   }
+  // text needs its font weight loaded first; a newer request wins over a slower older one
+  let maskToken = 0, maskTimer = 0;
+  async function rebuildMask() {
+    const token = ++maskToken;
+    if (ownText()) { try { await document.fonts.load(fontOf(100), S.text || 'A'); } catch (e) {} }
+    if (token === maskToken && W) buildMask();
+  }
+  const scheduleMask = () => { clearTimeout(maskTimer); maskTimer = setTimeout(rebuildMask, 120); };
   const randomTarget = () => (Math.random() * (mask.length / 2) | 0) * 2;
   function nearbyTarget(k) {
     const bx = mask[k] / BUCKET | 0, by = mask[k + 1] / BUCKET | 0;
@@ -134,15 +324,37 @@
     p.vx = 0; p.vy = 0;
     p.life = rnd(4, 12);
   }
+  function newLight() {
+    const p = { col: pickColor(), wide: Math.random() < 0.25, ambient: Math.random() < AMBIENT, speed: rnd(0.7, 1.4), seed: rnd(1000), layer: Math.random() * 3 | 0 };
+    spawn(p);
+    p.tgt = randomTarget();
+    return p;
+  }
+  // density changes add or drop lights instead of restarting them all
   function buildLights() {
-    const n = Math.round(Math.min(900, Math.max(260, W * H / 2400)));
-    P = [];
-    for (let i = 0; i < n; i++) {
-      const p = { col: pickColor(), wide: Math.random() < 0.25, ambient: Math.random() < AMBIENT, speed: rnd(0.7, 1.4), seed: rnd(1000), layer: Math.random() * 3 | 0 };
-      spawn(p);
-      p.tgt = randomTarget();
-      P.push(p);
-    }
+    const n = Math.round(Math.min(900, Math.max(260, W * H / 2400)) * S.density);
+    if (P.length > n) P.length = n;
+    while (P.length < n) P.push(newLight());
+  }
+
+  function setPalette() {
+    if (S.palette === 'custom') {
+      const h = parseInt(S.custom.slice(1), 16), c = [h >> 16, (h >> 8) & 255, h & 255];
+      const mix = (m) => c.map(v => Math.round(v + (255 - v) * m)).join(',');
+      COLORS = [{ c: c.join(','), w: 0.6 }, { c: mix(0.45), w: 0.25 }, { c: mix(0.85), w: 0.15 }];
+    } else COLORS = (PALETTES[S.palette] || PALETTES.photo).map(([c, w]) => ({ c, w }));
+    // ink for light backgrounds: what the colour absorbs (darkened a little so white still shows)
+    for (const col of COLORS) col.ink = col.c.split(',').map(v => Math.round(255 - v * 0.55)).join(',');
+    groups = COLORS.map(() => [[], []]);
+    for (const p of P) p.col = pickColor();
+  }
+
+  // light backgrounds: additive light would vanish, so the exposure is printed as ink instead
+  let lightBg = false;
+  function setBg() {
+    const h = parseInt(S.bg.slice(1), 16);
+    lightBg = (0.2126 * (h >> 16) + 0.7152 * ((h >> 8) & 255) + 0.0722 * (h & 255)) / 255 > 0.55;
+    document.body.style.background = S.bg;
   }
 
   function resize() {
@@ -151,8 +363,10 @@
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     trail = mk(canvas.width, canvas.height); tCtx = trail.getContext('2d');
     tCtx.fillStyle = '#000'; tCtx.fillRect(0, 0, trail.width, trail.height);
-    buildMask();
+    P = [];
     buildLights();
+    buildMask();
+    if (ownText()) rebuildMask();
   }
 
   // smooth swirling flow (sum of sines, no seams); three offset layers make crossing streams
@@ -183,10 +397,10 @@
   });
 
   // ---------- frame ----------
-  const groups = COLORS.map(() => [[], []]);   // [thin, wide] segment lists per colour
+  let groups = [];   // [thin, wide] segment lists per colour
   let last = performance.now();
   function frame(ms) {
-    const dt = Math.min(0.05, (ms - last) / 1000);
+    const dt = Math.min(0.05, (ms - last) / 1000) * S.speed;
     last = ms;
     clock += dt;
     const t = clock;
@@ -224,15 +438,15 @@
 
     // exposure: old light fades slowly, new light adds up
     tCtx.globalCompositeOperation = 'source-over';
-    tCtx.fillStyle = `rgba(0,0,0,${Math.min(1, FADE * f)})`;
+    tCtx.fillStyle = `rgba(0,0,0,${Math.min(1, FADE / S.trail * f)})`;
     tCtx.fillRect(0, 0, trail.width, trail.height);
     tCtx.globalCompositeOperation = 'lighter';
     tCtx.lineCap = 'round';
     groups.forEach((g, ci) => {
       g.forEach((seg, wide) => {
         if (!seg.length) return;
-        tCtx.lineWidth = (wide ? 2.6 : 1.1) * dpr * Math.max(0.8, unit * 1.2);
-        tCtx.strokeStyle = `rgba(${COLORS[ci].c},${wide ? 0.2 : 0.45})`;
+        tCtx.lineWidth = (wide ? 2.6 : 1.1) * dpr * Math.max(0.8, unit * 1.2) * S.thickness;
+        tCtx.strokeStyle = `rgba(${lightBg ? COLORS[ci].ink : COLORS[ci].c},${Math.min(1, (wide ? 0.2 : 0.45) * S.intensity)})`;
         tCtx.beginPath();
         for (let i = 0; i < seg.length; i += 4) {
           tCtx.moveTo(seg[i] * dpr, seg[i + 1] * dpr);
@@ -246,16 +460,19 @@
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.filter = 'none';
-    ctx.fillStyle = '#030305';
+    ctx.fillStyle = S.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.85;
-    ctx.filter = `contrast(1.25) blur(${12 * dpr}px)`;
-    ctx.drawImage(trail, 0, 0);
-    ctx.globalAlpha = 0.7;
-    ctx.filter = `contrast(1.25) blur(${3 * dpr}px)`;
-    ctx.drawImage(trail, 0, 0);
-    ctx.filter = 'contrast(1.25)';   // also clips the faint residue a slow 8-bit fade never clears
+    ctx.globalCompositeOperation = lightBg ? 'multiply' : 'lighter';
+    const ink = lightBg ? ' invert(1)' : '';   // absorbed light -> ink multiplied onto the paper
+    if (S.glow > 0) {
+      ctx.globalAlpha = Math.min(1, 0.85 * S.glow);
+      ctx.filter = `contrast(1.25)${ink} blur(${12 * dpr}px)`;
+      ctx.drawImage(trail, 0, 0);
+      ctx.globalAlpha = Math.min(1, 0.7 * S.glow);
+      ctx.filter = `contrast(1.25)${ink} blur(${3 * dpr}px)`;
+      ctx.drawImage(trail, 0, 0);
+    }
+    ctx.filter = `contrast(1.25)${ink}`;   // also clips the faint residue a slow 8-bit fade never clears
     ctx.globalAlpha = 1;
     ctx.drawImage(trail, 0, 0);
     ctx.filter = 'none';
@@ -265,7 +482,7 @@
     const v = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.35,
                                        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.75);
     v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,0.7)');
+    v.addColorStop(1, `rgba(0,0,0,${lightBg ? 0.18 : 0.7})`);
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -288,7 +505,8 @@
     else (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
   };
   canvas.addEventListener('dblclick', toggleFullscreen);
-  window.addEventListener('keydown', e => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+  const typing = (e) => e.target.closest && e.target.closest('input, textarea, select');
+  window.addEventListener('keydown', e => { if ((e.key === 'f' || e.key === 'F') && !typing(e)) toggleFullscreen(); });
 
   // ---------- sound: a drone that opens up as the lights write the word ----------
   // all synthesised (Web Audio): low detuned pad, airy noise "whoosh" driven by how fast the
@@ -373,11 +591,68 @@
   };
   sndBtn.addEventListener('click', toggleSound);
   sndBtn.addEventListener('dblclick', e => e.stopPropagation());
-  window.addEventListener('keydown', e => { if (e.key === 'm' || e.key === 'M') toggleSound(); });
+  window.addEventListener('keydown', e => { if ((e.key === 'm' || e.key === 'M') && !typing(e)) toggleSound(); });
+
+  // ---------- tool panel ----------
+  const menuBtn = document.getElementById('menu'), panel = document.getElementById('panel');
+  const setOpen = (open) => { panel.hidden = !open; menuBtn.setAttribute('aria-expanded', String(open)); };
+  menuBtn.addEventListener('click', () => setOpen(panel.hidden));
+  menuBtn.addEventListener('dblclick', e => e.stopPropagation());
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { setOpen(false); menuBtn.focus(); } });
+
+  const inputs = [...panel.querySelectorAll('[data-k]')];
+  const fmt = (k, v) => k === 'bg' || k === 'custom' ? v.toUpperCase() : k === 'smooth' || k === 'spacing' ? v.toFixed(2) : `${v.toFixed(2)}×`;
+  function syncUI() {
+    for (const el of inputs) {
+      if (el !== document.activeElement) el.value = S[el.dataset.k];   // keeps the caret while typing
+      const out = el.parentElement.querySelector('output');
+      if (out) out.textContent = fmt(el.dataset.k, el.type === 'range' ? +S[el.dataset.k] : S[el.dataset.k]);
+    }
+    panel.querySelector('[data-show="custom"]').hidden = S.palette !== 'custom';
+    panel.querySelector('textarea').style.fontWeight = S.weight;
+  }
+  function apply(k) {
+    if (['text', 'weight', 'smooth', 'spacing'].includes(k)) scheduleMask();
+    if (k === 'bg') setBg();
+    if (k === 'palette' || k === 'custom') setPalette();
+    if (k === 'density') buildLights();
+    syncUI();
+    save();
+  }
+  for (const el of inputs) el.addEventListener('input', () => {
+    const k = el.dataset.k;
+    S[k] = el.type === 'range' || k === 'weight' ? +el.value : el.value;
+    apply(k);
+  });
+  panel.querySelector('.reset').addEventListener('click', () => {
+    Object.assign(S, DEFAULTS);
+    document.activeElement?.blur();   // lets syncUI clear the text field too
+    setBg(); setPalette(); buildLights(); rebuildMask(); syncUI(); save();
+  });
+
+  // ---------- screenshot: the current frame as a PNG (canvas only, no buttons) ----------
+  const shotBtn = document.getElementById('shot'), flash = document.getElementById('flash');
+  function screenshot() {
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const a = document.createElement('a'), stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      a.href = URL.createObjectURL(blob);
+      a.download = `source-lost-${stamp}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }, 'image/png');
+    flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+  }
+  shotBtn.addEventListener('click', screenshot);
+  shotBtn.addEventListener('dblclick', e => e.stopPropagation());
+  window.addEventListener('keydown', e => { if ((e.key === 'p' || e.key === 'P') && !typing(e)) screenshot(); });
 
   // debug hook: jump the timeline (e.g. window.__seek(8))
   window.__seek = (s) => { clock = s; };
 
+  setPalette();
+  setBg();
+  syncUI();
   resize();
   requestAnimationFrame(frame);
 })();
