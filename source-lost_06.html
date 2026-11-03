@@ -71,7 +71,7 @@
 
   #panel {
     position: fixed; z-index: 2; top: calc(max(16px, env(safe-area-inset-top)) + 64px); right: max(16px, env(safe-area-inset-right));
-    width: min(300px, calc(100vw - 32px)); max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - 80px); overflow-y: auto;
+    width: min(300px, calc(100vw - 32px)); max-height: calc(100dvh - max(16px, env(safe-area-inset-top)) - 150px); overflow-y: auto;
     padding: 6px 16px 16px; border-radius: 14px; box-sizing: border-box;
     border: 1px solid rgba(255,255,255,0.14); background: rgba(10,10,14,0.74);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -81,7 +81,6 @@
   }
   #panel[hidden] { display: block; visibility: hidden; opacity: 0; transform: translateY(-8px) scale(0.98); pointer-events: none; }
   #panel .row[hidden] { display: none; }
-  #panel h3 { margin: 14px 0 8px; font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
   #panel .row { margin: 0 0 10px; }
   #panel .lab { display: flex; justify-content: space-between; margin-bottom: 4px; }
   #panel .lab output { font: 11px ui-monospace, Menlo, monospace; color: rgba(255,255,255,0.55); }
@@ -99,6 +98,75 @@
   #panel .reset { width: 100%; margin-top: 8px; padding: 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18);
                   background: none; color: rgba(255,255,255,0.75); font: inherit; cursor: pointer; }
   #panel .reset:hover { border-color: rgba(255,90,70,0.7); color: #fff; }
+  /* collapsible sections */
+  #panel details { border-top: 1px solid rgba(255,255,255,0.08); }
+  #panel details:first-of-type { border-top: 0; }
+  #panel summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 13px 2px; cursor: pointer; user-select: none;
+                   font: 600 10px ui-monospace, Menlo, monospace; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.6);
+                   transition: color .2s ease; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: ''; margin-left: auto; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+                          transform: translateY(-2px) rotate(45deg); transition: transform .25s ease; }
+  #panel details[open] > summary::after { transform: translateY(1px) rotate(-135deg); }
+  #panel summary:hover, #panel summary:focus-visible, #panel details[open] > summary { color: #fff; outline: none; }
+  #panel summary:focus-visible { text-decoration: underline; text-underline-offset: 4px; }
+  #panel summary .dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: #ff2a3a; box-shadow: 0 0 8px #ff2a3a; }
+  #panel details.active summary .dot { display: block; }
+  #panel details > .body { padding: 0 0 8px; }
+  #panel #imgctl { margin-top: 4px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); }
+  #panel .up { display: flex; gap: 6px; }
+  #panel .file { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 8px;
+                 border: 1px dashed rgba(255,255,255,0.28); color: rgba(255,255,255,0.75); cursor: pointer; }
+  #panel .file:hover, #panel .file:focus-within { border-color: rgba(255,90,70,0.75); color: #fff; }
+  #panel .file input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  #panel .file svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #panel .file .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #panel .file.on { border-style: solid; border-color: rgba(255,90,70,0.6); background: rgba(255,40,45,0.1); color: #fff; }
+  #panel .x { flex: none; width: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: none; color: rgba(255,255,255,0.7); font-size: 14px; cursor: pointer; }
+  #panel .x:hover { border-color: rgba(255,90,70,0.7); color: #fff; }
+  #panel .note { margin: -4px 0 10px; font-size: 11px; color: rgba(255,255,255,0.5); white-space: pre-line; }
+  #panel .note.err { color: #ff8a80; }
+  #panel .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  #panel .check input { accent-color: #ff2a3a; width: 15px; height: 15px; margin: 0; }
+  #panel .dims { display: flex; align-items: center; gap: 6px; }
+  #panel .dims input, #panel .page input { width: 80px; box-sizing: border-box; border-radius: 8px; border: 1px solid rgba(255,255,255,0.16);
+                 background: rgba(0,0,0,0.4); color: #fff; padding: 7px 8px; font: 13px ui-monospace, Menlo, monospace; }
+  #panel .dims input:focus, #panel .page input:focus { outline: none; border-color: rgba(255,90,70,0.7); }
+  #panel .page { display: flex; align-items: center; gap: 8px; }
+  #panel #sizeout { display: block; margin-top: 6px; font: 11px ui-monospace, Menlo, monospace; color: rgba(255,255,255,0.55); }
+
+  /* output-size frame: the canvas sits centred with the letterbox around it */
+  canvas.framed { box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 24px 70px rgba(0,0,0,0.7); }
+  body.drop::after { content: 'Drop JPG · PNG · SVG · PDF'; position: fixed; inset: 12px; z-index: 4; display: grid; place-items: center;
+                     border: 2px dashed rgba(255,90,70,0.8); border-radius: 18px; background: rgba(0,0,0,0.55);
+                     color: #fff; font: 600 16px -apple-system, 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.06em; pointer-events: none; }
+
+  /* timeline: pause, scrub back over the last minute, step forward */
+  #tl { position: fixed; z-index: 2; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+        width: min(640px, calc(100vw - 32px)); box-sizing: border-box; display: flex; align-items: center; gap: 4px; padding: 5px 14px 5px 6px;
+        border-radius: 26px; border: 1px solid rgba(255,255,255,0.14); background: rgba(10,10,14,0.62);
+        -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+        color: rgba(255,255,255,0.8); font: 11px ui-monospace, Menlo, monospace; transition: opacity .5s ease; }
+  #tl.idle:not(:hover):not(:focus-within) { opacity: 0; }
+  #tl button { flex: none; width: 36px; height: 36px; padding: 10px; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer;
+               transition: background .2s ease, color .2s ease; }
+  #tl button:hover, #tl button:focus-visible { background: rgba(255,40,45,0.22); color: #fff; outline: none; }
+  #tl button svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+  #tl [data-tl=play] .i-play, #tl [data-tl=play].paused .i-pause { display: none; }
+  #tl [data-tl=play].paused .i-play { display: block; }
+  #tl .track { position: relative; flex: 1; min-width: 60px; height: 36px; margin: 0 6px; }
+  #tl .track canvas { position: absolute; left: 0; top: 15px; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); }
+  #tl input[type=range] { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; background: none; cursor: pointer;
+                          -webkit-appearance: none; appearance: none; }
+  #tl input[type=range]:focus { outline: none; }
+  #tl input[type=range]::-webkit-slider-runnable-track { height: 6px; background: transparent; }
+  #tl input[type=range]::-moz-range-track { height: 6px; background: transparent; }
+  #tl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px; border-radius: 50%;
+                          background: #fff; box-shadow: 0 0 0 3px rgba(255,40,45,0.55), 0 0 12px rgba(255,40,45,0.8); }
+  #tl input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%;
+                          background: #fff; box-shadow: 0 0 0 3px rgba(255,40,45,0.55), 0 0 12px rgba(255,40,45,0.8); }
+  #tl input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px #30ffe0; }
+  #tl output { flex: none; min-width: 58px; text-align: right; letter-spacing: 0.06em; }
 </style>
 </head>
 <body>
@@ -126,8 +194,9 @@
 </button>
 <div id="flash"></div>
 <div id="panel" hidden>
-  <h3>Text</h3>
+  <details data-sec="text" open><summary>Text</summary><div class="body">
   <div class="row"><textarea data-k="text" rows="2" spellcheck="false" aria-label="Your text" placeholder="Type your own text…"></textarea></div>
+  <p class="note" data-show="upload">An uploaded image is shown — remove it to use the text.</p>
   <div class="row"><div class="lab"><span>Weight</span></div>
     <select data-k="weight">
       <option value="200">ExtraLight</option><option value="300">Light</option><option value="400">Regular</option>
@@ -135,11 +204,92 @@
     </select></div>
   <div class="row"><div class="lab"><span>Smooth</span><output></output></div><input type="range" data-k="smooth" min="0" max="1" step="0.01"></div>
   <div class="row"><div class="lab"><span>Letter spacing</span><output></output></div><input type="range" data-k="spacing" min="-0.1" max="0.6" step="0.01"></div>
+  </div></details>
 
-  <h3>Background</h3>
+  <details data-sec="raster"><summary>Raster<i class="dot" aria-hidden="true"></i></summary><div class="body">
+  <div class="row up">
+    <label class="file" data-up="raster"><input type="file" accept="image/jpeg,image/png,.jpg,.jpeg,.png">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>
+      <span class="name">Upload JPG / PNG</span></label>
+    <button type="button" class="x" data-clear="raster" aria-label="Remove image">✕</button>
+  </div>
+  <p class="note" data-note="raster" hidden></p>
+  </div></details>
+
+  <details data-sec="vector"><summary>Vector<i class="dot" aria-hidden="true"></i></summary><div class="body">
+  <div class="row up">
+    <label class="file" data-up="vector"><input type="file" accept=".svg,.pdf,image/svg+xml,application/pdf">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 20 4"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/><path d="M4 20c0-9 7-16 16-16"/></svg>
+      <span class="name">Upload SVG / PDF</span></label>
+    <button type="button" class="x" data-clear="vector" aria-label="Remove image">✕</button>
+  </div>
+  <p class="note" data-note="vector" hidden></p>
+  <div class="row page" data-show="pdfpage"><span>Page</span><input type="number" id="pdfpage" min="1" value="1" aria-label="PDF page"><span id="pdfpages"></span></div>
+  </div></details>
+
+  <!-- image controls: moved into the Raster or Vector section of the active upload -->
+  <div id="imgctl" data-show="upload">
+    <div class="row"><div class="lab"><span>Mode</span></div>
+      <select data-k="imgMode">
+        <option value="photo">Portrait / photo — lines follow the face</option><option value="silhouette">Silhouette — shape by threshold</option>
+      </select></div>
+    <div class="row" data-show="silhouette"><div class="lab"><span>Threshold</span><output></output></div><input type="range" data-k="threshold" min="0.02" max="0.98" step="0.01"></div>
+    <div class="row" data-show="photo"><div class="lab"><span>Contrast</span><output></output></div><input type="range" data-k="contrast" min="0.3" max="4" step="0.05"></div>
+    <div class="row" data-show="photo"><div class="lab"><span>Detail (features & contours)</span><output></output></div><input type="range" data-k="detail" min="0" max="1" step="0.01"></div>
+    <div class="row"><div class="lab"><span>Scale</span><output></output></div><input type="range" data-k="imgScale" min="0.3" max="1.6" step="0.01"></div>
+    <div class="row"><div class="lab"><span>Photo opacity</span><output></output></div><input type="range" data-k="photoMix" min="0" max="1" step="0.01"></div>
+    <div class="row"><div class="lab"><span>Photo reveal ←→</span><output></output></div><input type="range" data-k="photoWipe" min="0" max="1" step="0.005"></div>
+    <div class="row" data-show="photo"><label class="check"><input type="checkbox" data-k="recognise"> Recognise faces &amp; people (AI, in the browser)</label></div>
+    <div class="row" data-show="photo"><label class="check"><input type="checkbox" data-k="cutout"> Remove background</label></div>
+    <div class="row"><label class="check"><input type="checkbox" data-k="invert"> Invert</label></div>
+  </div>
+
+  <details data-sec="style" open><summary>Line style</summary><div class="body">
+  <div class="row">
+    <select data-k="lineStyle" aria-label="Line style">
+      <option value="trails">Light trails — flowing long-exposure lines</option>
+      <option value="strings">Strings — straight lines between matching tones</option>
+      <option value="network">Network — a web of glowing nodes</option>
+      <option value="hatch">Hatching — engraved parallel strokes</option>
+      <option value="scan">Scanlines — rows of a CRT signal</option>
+    </select></div>
+  <div class="row"><div class="lab"><span>Focus (lines on the image)</span><output></output></div><input type="range" data-k="styleFocus" min="0.2" max="1" step="0.01"></div>
+  <div class="row" data-show="shaped"><div class="lab"><span>Line length</span><output></output></div><input type="range" data-k="styleLength" min="0.3" max="2.5" step="0.05"></div>
+  <div class="row" data-show="shaped"><div class="lab"><span>Precision (stay inside tones)</span><output></output></div><input type="range" data-k="stylePrecision" min="0" max="1" step="0.01"></div>
+  <div class="row" data-show="lined"><div class="lab"><span>Line spacing</span><output></output></div><input type="range" data-k="styleSpacing" min="2" max="24" step="0.5"></div>
+  <div class="row" data-show="hatch"><div class="lab"><span>Angle</span><output></output></div><input type="range" data-k="styleAngle" min="0" max="180" step="1"></div>
+  <div class="row" data-show="hatch"><label class="check"><input type="checkbox" data-k="styleCross"> Cross-hatch</label></div>
+  <div class="row" data-show="scan"><div class="lab"><span>Signal wobble</span><output></output></div><input type="range" data-k="styleWobble" min="0" max="1" step="0.01"></div>
+  <div class="row" data-show="network"><div class="lab"><span>Node glow</span><output></output></div><input type="range" data-k="styleNodes" min="0" max="1" step="0.01"></div>
+  </div></details>
+
+  <details data-sec="size"><summary>Size</summary><div class="body">
+  <div class="row">
+    <select data-k="size" aria-label="Output size">
+      <option value="screen">Full screen</option>
+      <option value="ig_post">Instagram post · 1080 × 1080</option>
+      <option value="ig_portrait">Instagram portrait · 1080 × 1350</option>
+      <option value="story">Story / Reels / TikTok · 1080 × 1920</option>
+      <option value="fb">Facebook post · 1200 × 630</option>
+      <option value="x">X post · 1600 × 900</option>
+      <option value="linkedin">LinkedIn post · 1200 × 627</option>
+      <option value="yt">YouTube thumbnail · 1280 × 720</option>
+      <option value="pin">Pinterest pin · 1000 × 1500</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <output id="sizeout"></output>
+  </div>
+  <div class="row dims" data-show="customsize">
+    <input type="number" data-k="cw" min="200" max="4096" step="1" aria-label="Width in pixels"><span>×</span>
+    <input type="number" data-k="ch" min="200" max="4096" step="1" aria-label="Height in pixels"><span>px</span>
+  </div>
+  </div></details>
+
+  <details data-sec="bg"><summary>Background</summary><div class="body">
   <div class="row color"><input type="color" data-k="bg" aria-label="Background colour"><output></output></div>
+  </div></details>
 
-  <h3>Lines</h3>
+  <details data-sec="lines"><summary>Lines</summary><div class="body">
   <div class="row"><div class="lab"><span>Colours</span></div>
     <select data-k="palette">
       <option value="photo">Red · blue (photo)</option><option value="fire">Fire</option><option value="ice">Ice</option>
@@ -151,11 +301,22 @@
   <div class="row"><div class="lab"><span>Density</span><output></output></div><input type="range" data-k="density" min="0.3" max="2.5" step="0.05"></div>
   <div class="row"><div class="lab"><span>Trail length</span><output></output></div><input type="range" data-k="trail" min="0.3" max="4" step="0.05"></div>
   <div class="row"><div class="lab"><span>Glow</span><output></output></div><input type="range" data-k="glow" min="0" max="2.5" step="0.05"></div>
+  </div></details>
 
-  <h3>Motion</h3>
+  <details data-sec="motion"><summary>Motion</summary><div class="body">
   <div class="row"><div class="lab"><span>Speed</span><output></output></div><input type="range" data-k="speed" min="0.1" max="3" step="0.05"></div>
-
+  </div></details>
   <button type="button" class="reset">Reset to defaults</button>
+</div>
+<div id="tl" role="group" aria-label="Timeline">
+  <button type="button" data-tl="back" aria-label="Back 1 second" title="Back 1 s (←)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5v14L2 12zM21 5v14l-9-7z"/></svg></button>
+  <button type="button" data-tl="play" aria-label="Pause" title="Play / pause (Space)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-pause" d="M6 4h4v16H6zM14 4h4v16h-4z"/><path class="i-play" d="M6 4l14 8-14 8z"/></svg></button>
+  <button type="button" data-tl="fwd" aria-label="Forward 1 second" title="Forward 1 s (→)">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5v14l9-7zM3 5v14l9-7z"/></svg></button>
+  <div class="track"><canvas aria-hidden="true"></canvas><input type="range" min="0" max="1" step="1" value="1" aria-label="Scrub the last minute"></div>
+  <output>LIVE</output>
 </div>
 <script>
 (() => {
@@ -196,25 +357,47 @@
     text: '', weight: 700, smooth: 0, spacing: 0,
     bg: '#000000', palette: 'photo', custom: '#ff2a3a',
     intensity: 1, thickness: 1, density: 1, trail: 1, glow: 1, speed: 1,
+    imgMode: 'photo', threshold: 0.5, contrast: 1.3, detail: 0.6, imgScale: 1, invert: false, cutout: true, recognise: true, photoMix: 0, photoWipe: 0,
+    lineStyle: 'trails', styleFocus: 0.78, styleLength: 1, stylePrecision: 0.6, styleSpacing: 6, styleAngle: 45, styleCross: true, styleWobble: 0.35, styleNodes: 0.6,
+    size: 'screen', cw: 1080, ch: 1080,
   };
   const STORE = 'source-lost-06-v2';
   const S = { ...DEFAULTS };
   try { Object.assign(S, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) {}
+  if (S.imgMode === 'tone') S.imgMode = 'photo';   // older saved setting
   const ownText = () => S.text.trim() !== '';
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
 
   const FADE = 0.045;            // per-frame fade of the exposure (lower = longer trails)
+  // photos: a longer exposure of thinner, dimmer lines, so the face builds up out of many strokes
+  const PHOTO_EXPOSURE = 3, PHOTO_LIGHT = 0.32;
+  const fadeRate = () => FADE / S.trail / (flow ? PHOTO_EXPOSURE : 1);
   const FREE = 5.5, GATHER = 2.2, HOLD = 4.5, RELEASE = 1.8;   // timeline (s)
   const AMBIENT = 0.22;          // share of lights that never join the word
 
-  let W, H, dpr, trail, tCtx;
-  let mask = [], buckets, bw, bh, BUCKET = 26, unit = 1;
+  let W, H, dpr, trail, tCtx, framed = false;
+  let unit = 1;
   let P = [];
+  let upload = null, imgRect = null;   // imgRect: where the uploaded image sits, for the photo overlay   // { kind: 'raster' | 'vector', name, img (canvas), alpha } — wins over text and drawing
 
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
-  const rnd = (a = 1, b) => b === undefined ? Math.random() * a : a + Math.random() * (b - a);
+  // seeded random for everything inside a simulation step, so the timeline can replay it exactly
+  let rng = 0x2f6b3c1d;
+  const R = () => {
+    rng = (rng + 0x6D2B79F5) | 0;
+    let t = rng;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const rnd = (a = 1, b) => b === undefined ? R() * a : a + R() * (b - a);
+  const hash = (i, j) => {   // stable per-cell noise for the Tone mode
+    let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
   const smooth = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
-  const pickColor = () => {
+  const pickColor = () => {   // outside the steps (palette / new lights), so plain Math.random
     let r = Math.random();
     for (let i = 0; i < COLORS.length; i++) { r -= COLORS[i].w; if (r <= 0) return i; }
     return 0;
@@ -266,14 +449,285 @@
     }
   }
 
+  // uploaded image, fitted into the same box as the lettering; returns a size for SMOOTH and
+  // the photo's rectangle in mask cells
+  function drawUpload(x, STEP) {
+    const { img } = upload;
+    const photo = S.imgMode === 'photo';   // photos get more of the frame: the face is only part of them
+    const k = Math.min(W * (photo ? 0.92 : 0.86) / img.width, H * (photo ? 0.9 : 0.66) / img.height) * S.imgScale;
+    const dw = img.width * k, dh = img.height * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, ox / STEP, oy / STEP, dw / STEP, dh / STEP);
+    imgRect = { x: ox, y: oy, w: dw, h: dh };
+    return { em: Math.min(dw, dh) * 0.15, rect: [ox / STEP, oy / STEP, (ox + dw) / STEP, (oy + dh) / STEP] };
+  }
+  // pixels -> how strongly each cell belongs to the shape (0..255)
+  function uploadWeights(data, n) {
+    const a = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const o = i * 4, cover = data[o + 3] / 255;
+      if (!cover) continue;
+      const lum = (0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2]) / 255;
+      // transparent images: the shape is the alpha; opaque ones: dark parts (or light ones, inverted)
+      const tone = upload.alpha ? (S.invert ? lum : 1) : (S.invert ? lum : 1 - lum);
+      a[i] = 255 * cover * tone;
+    }
+    return a;
+  }
+
+  // portraits: a face reads through its lit planes and its features (lids, brows, nostrils, lips,
+  // jaw). So: cut the person off the background, fade the photo's edges (no rectangle), stretch the
+  // levels, boost local contrast, pull out the features as lines, and keep the contour direction
+  // so the lights draw along the features instead of scribbling across them
+  let flow = null, flowW = 0, flowStep = 3;   // per mask cell: contour tangent × feature strength
+  let toneGrid = null, catGrid = null;         // per mask cell: tone (0..1, the shape itself for text) and recognised part
+  let shapeGrid = null;                        // per mask cell: how much it belongs to the shape (0..1)
+  let npool = null;                            // Network style: a fixed, sparse set of nodes
+
+  // ---------- recognition: faces and people (MediaPipe, runs in the browser) ----------
+  // fetched the first time a photo is opened (library + models ≈ 30 MB, then cached); the photo
+  // itself never leaves the page
+  const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+  const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+  const SEG_MODEL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/1/selfie_multiclass_256x256.tflite';
+  const REGIONS = ['background', 'hair', 'skin', 'face', 'clothes', 'accessories'];
+  // nose, which MediaPipe has no contour set for: bridge, tip and the base of the nostrils
+  const NOSE = [[168, 6, 197, 195, 5, 4, 1], [98, 97, 2, 326, 327], [64, 98], [294, 327], [129, 64], [358, 294]];
+  let visionReady = null;
+  const loadVision = () => visionReady ||= (async () => {
+    const v = await import(`${MP}/vision_bundle.mjs`);
+    const files = await v.FilesetResolver.forVisionTasks(`${MP}/wasm`);
+    // GPU first; some machines only manage the CPU path
+    const make = (Task, opts) => Task.createFromOptions(files, { ...opts, baseOptions: { ...opts.baseOptions, delegate: 'GPU' } })
+      .catch(() => Task.createFromOptions(files, { ...opts, baseOptions: { ...opts.baseOptions, delegate: 'CPU' } }));
+    const [face, seg] = await Promise.all([
+      make(v.FaceLandmarker, { baseOptions: { modelAssetPath: FACE_MODEL }, runningMode: 'IMAGE', numFaces: 6 }),
+      make(v.ImageSegmenter, { baseOptions: { modelAssetPath: SEG_MODEL }, runningMode: 'IMAGE', outputCategoryMask: true, outputConfidenceMasks: false }),
+    ]);
+    return { v, face, seg };
+  })().catch(err => { visionReady = null; throw err; });
+
+  // finds faces (478 landmarks each) and the parts of a person (hair, face, skin, clothes)
+  async function analyse(img) {
+    const { v, face, seg } = await loadVision();
+    const faces = face.detect(img).faceLandmarks || [];
+    let regions = null, found = new Set();
+    const sr = seg.segment(img), m = sr.categoryMask;
+    if (m) {
+      const data = m.getAsUint8Array().slice();
+      regions = { w: m.width, h: m.height, data };
+      const cnt = new Uint32Array(8);
+      for (let i = 0; i < data.length; i += 3) cnt[data[i]]++;
+      for (let c = 1; c < REGIONS.length; c++) if (cnt[c] > data.length / 3 * 0.004) found.add(c);
+      m.close();
+    }
+    sr.close?.();
+    // feature lines in image coordinates (0..1): eyes, brows, irises, lips, nose, face oval
+    const F = v.FaceLandmarker, lines = [];
+    const sets = [[F.FACE_LANDMARKS_LEFT_EYE, 1], [F.FACE_LANDMARKS_RIGHT_EYE, 1], [F.FACE_LANDMARKS_LEFT_EYEBROW, 1],
+                  [F.FACE_LANDMARKS_RIGHT_EYEBROW, 1], [F.FACE_LANDMARKS_LIPS, 1], [F.FACE_LANDMARKS_LEFT_IRIS, 0.9],
+                  [F.FACE_LANDMARKS_RIGHT_IRIS, 0.9], [F.FACE_LANDMARKS_FACE_OVAL, 0.75]];
+    for (const lm of faces) {
+      let minX = 1, maxX = 0;
+      for (const q of lm) { minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); }
+      const fw = maxX - minX;   // face width, sets the line weight
+      for (const [conn, wt] of sets) for (const c of conn || []) {
+        const a = lm[c.start], b = lm[c.end];
+        if (a && b) lines.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, w: wt, fw });
+      }
+      for (const chain of NOSE) for (let i = 1; i < chain.length; i++) {
+        const a = lm[chain[i - 1]], b = lm[chain[i]];
+        if (a && b) lines.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y, w: 0.9, fw });
+      }
+    }
+    const person = found.has(1) || found.has(2) || found.has(3) || faces.length > 0;
+    return { faces: faces.length, regions, found: [...found].map(c => REGIONS[c]), person, lines };
+  }
+  const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+  function photoWeights(data, w, h, rect) {
+    const n = w * h, L = new Float32Array(n), inside = new Uint8Array(n), hist = new Uint32Array(256);
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      if (data[o + 3] < 128) continue;
+      const l = 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
+      L[i] = l; inside[i] = 1; hist[l | 0]++; count++;
+    }
+    const a = new Float32Array(n), feat = new Float32Array(n);
+    if (!count) return { a, feat, field: null };
+    const an = S.recognise && upload.analysis;   // what recognition found, when it ran
+    const regions = an && an.person ? an.regions : null;
+
+    // subject: distance from the background colour, read from a thin band along the top and sides
+    // (the bottom edge of a portrait is usually the person's shoulders)
+    const [x0, y0, x1, y1] = rect, rw = x1 - x0, rh = y1 - y0;
+    const band = Math.max(2, Math.min(rw, rh) * 0.05);
+    const inBand = (i, j) => Math.min(i - x0, x1 - i, j - y0) <= band && j - y0 < rh * 0.8;
+    const hr = new Uint32Array(256), hg = new Uint32Array(256), hb = new Uint32Array(256);
+    let nb = 0;
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const k = j * w + i;
+      if (!inside[k] || !inBand(i, j)) continue;
+      hr[data[k * 4]]++; hg[data[k * 4 + 1]]++; hb[data[k * 4 + 2]]++; nb++;
+    }
+    const med = (hh) => { let c = 0; for (let v = 0; v < 256; v++) { c += hh[v]; if (c >= nb / 2) return v; } return 0; };
+    const br = med(hr), bg = med(hg), bb = med(hb);
+    const dist = (k) => Math.hypot(data[k * 4] - br, data[k * 4 + 1] - bg, data[k * 4 + 2] - bb) / 441.7;
+    const bd = [];
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const k = j * w + i;
+      if (inside[k] && inBand(i, j) && (k & 3) === 0) bd.push(dist(k));
+    }
+    bd.sort((p, q) => p - q);
+    const spread = bd.length ? bd[Math.floor(bd.length * 0.6)] : 1;   // robust: hair or a shoulder in the band doesn't count
+    // a busy background (spread high) can't be cut by colour: then only the edge fade is used
+    const cut = S.cutout && spread < 0.2;
+    const subj = new Float32Array(n);
+    const fadeW = Math.min(rw, rh) * 0.14, cutLo = spread * 1.5 + 0.04;
+    // recognised person: the subject is exactly the person, and each part gets its own weight
+    // (face brightest, then skin and hair, clothes dim) so the main elements read first
+    const region = new Float32Array(n).fill(1), cat = new Uint8Array(n);
+    if (regions) {
+      const RW = [0, 0.75, 0.85, 1, 0.3, 0.6];
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const k = j * w + i;
+        if (!inside[k]) continue;
+        const u = (i + 0.5 - x0) / rw, v = (j + 0.5 - y0) / rh;
+        if (u < 0 || v < 0 || u >= 1 || v >= 1) continue;
+        const c = regions.data[(v * regions.h | 0) * regions.w + (u * regions.w | 0)];
+        cat[k] = c; subj[k] = (S.cutout ? c > 0 : 1) ? 1 : 0; region[k] = RW[c] ?? 0.6;
+      }
+      for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+        const k = j * w + i;
+        subj[k] = inside[k] ? subj[k] * smooth(Math.min(i - x0, x1 - i, j - y0, y1 - j) / (fadeW * 0.4)) : 0;
+      }
+    } else if (cut) {
+      // colour cut, then closed: a wide blur + threshold fills eye whites, teeth, shadows on the
+      // skin and highlights that happen to match the background colour
+      for (let i = 0; i < n; i++) if (inside[i]) subj[i] = smooth((dist(i) - cutLo) / 0.12);
+      boxBlur(subj, w, h, Math.max(2, Math.round(Math.min(rw, rh) * 0.05)));
+      for (let i = 0; i < n; i++) subj[i] = smooth((subj[i] - 0.2) / 0.35);
+    } else subj.fill(1);
+    if (!regions) for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+      const k = j * w + i;
+      if (!inside[k]) { subj[k] = 0; continue; }
+      // portraits put the face near the centre, a bit high: that area is always kept, so a
+      // background close to skin colour (wood, beige walls) can't eat the face
+      const ex = (i - (x0 + rw * 0.5)) / (rw * 0.34), ey = (j - (y0 + rh * 0.42)) / (rh * 0.36);
+      const centre = 1 - smooth((Math.hypot(ex, ey) - 0.75) / 0.45);
+      subj[k] = Math.max(subj[k] * (cut ? 0.85 : 1), centre) * smooth(Math.min(i - x0, x1 - i, j - y0, y1 - j) / fadeW);
+    }
+    boxBlur(subj, w, h, 2);
+
+    // levels from the subject only, so a bright wall doesn't flatten the face
+    hist.fill(0);
+    let cs = 0;
+    for (let i = 0; i < n; i++) if (inside[i] && subj[i] > 0.5) { hist[L[i] | 0]++; cs++; }
+    const total = cs > 50 ? cs : count;
+    if (cs <= 50) for (let i = 0; i < n; i++) if (inside[i]) hist[L[i] | 0]++;
+    const pct = (q) => { let c = 0; for (let v = 0; v < 256; v++) { c += hist[v]; if (c >= q * total) return v; } return 255; };
+    const lo = pct(0.02), hi = Math.max(lo + 1, pct(0.98));
+    let mean = 0;
+    for (let i = 0; i < n; i++) if (inside[i]) { L[i] = clamp01((L[i] - lo) / (hi - lo)); mean += L[i]; }
+    mean /= count;
+    for (let i = 0; i < n; i++) if (!inside[i]) L[i] = mean;   // no false edge at the photo border
+
+    const size = Math.sqrt(total);   // ~ subject size in cells
+    const B = L.slice(); boxBlur(B, w, h, Math.max(2, Math.round(size * 0.04)));     // local contrast
+    const g1 = L.slice(); boxBlur(g1, w, h, 1);                                       // fine
+    const g2 = L.slice(); boxBlur(g2, w, h, Math.max(2, Math.round(size * 0.012)));  // feature scale
+    // recognised face: its landmark contours drawn as lines; recognised person: the borders between
+    // its parts (hair / face / clothes) and its outline
+    let land = null, bnd = null;
+    if (an && an.lines.length) {
+      const lc = mk(w, h), lx = lc.getContext('2d', { willReadFrequently: true });
+      lx.lineCap = 'round'; lx.lineJoin = 'round'; lx.strokeStyle = '#fff';
+      for (const q of an.lines) {
+        lx.globalAlpha = q.w;
+        lx.lineWidth = Math.max(1.1, q.fw * rw * 0.016);
+        lx.beginPath();
+        lx.moveTo(x0 + q.ax * rw, y0 + q.ay * rh);
+        lx.lineTo(x0 + q.bx * rw, y0 + q.by * rh);
+        lx.stroke();
+      }
+      const ld = lx.getImageData(0, 0, w, h).data;
+      land = new Float32Array(n);
+      for (let i = 0; i < n; i++) land[i] = ld[i * 4 + 3] / 255;
+    }
+    if (regions) {
+      bnd = new Float32Array(n);
+      for (let j = 0; j < h - 1; j++) for (let i = 0; i < w - 1; i++) {
+        const k = j * w + i, c = cat[k];
+        if (c !== cat[k + 1] || c !== cat[k + w]) {
+          // glasses, hats, jewellery (accessories) are part of who someone is: full weight
+          const acc = c === 5 || cat[k + 1] === 5 || cat[k + w] === 5;
+          bnd[k] = acc ? 1.6 : c && cat[k + 1] && cat[k + w] ? 1 : 0.7;
+        }
+      }
+      boxBlur(bnd, w, h, 1);
+      for (let i = 0; i < n; i++) bnd[i] = clamp01(bnd[i] * 2.2) * (inside[i] ? 1 : 0);
+    }
+    // contour direction follows the landmark lines where there are any, else the photo
+    const GF = land ? g1.map((v, i) => v + 1.5 * land[i]) : g1;
+    // features: darker than their surroundings (lids, brows, nostrils, lip line) or a highlight
+    const gx = new Float32Array(n), gy = new Float32Array(n), mag = new Float32Array(n);
+    const dark = new Float32Array(n), lite = new Float32Array(n);
+    const sm = [], sd = [];
+    for (let j = 1; j < h - 1; j++) for (let i = 1; i < w - 1; i++) {
+      const k = j * w + i;
+      if (!inside[k]) continue;
+      const G = GF;
+      gx[k] = (G[k - w + 1] + 2 * G[k + 1] + G[k + w + 1]) - (G[k - w - 1] + 2 * G[k - 1] + G[k + w - 1]);
+      gy[k] = (G[k + w - 1] + 2 * G[k + w] + G[k + w + 1]) - (G[k - w - 1] + 2 * G[k - w] + G[k - w + 1]);
+      mag[k] = Math.hypot(gx[k], gy[k]) * subj[k];
+      dark[k] = Math.max(0, g2[k] - g1[k]) * subj[k];
+      lite[k] = Math.max(0, g1[k] - g2[k]) * subj[k];
+      if ((k & 7) === 0 && subj[k] > 0.9) { sm.push(mag[k]); sd.push(dark[k]); }
+    }
+    const p95 = (arr) => { arr.sort((p, q) => p - q); return arr[Math.floor(arr.length * 0.9)] || 1; };
+    const em = p95(sm) || 1, ed = p95(sd) || 1;
+    const field = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      if (!inside[i]) continue;
+      const tone = clamp01(L[i] + 1.3 * (L[i] - B[i]));
+      const t = S.invert ? 1 - tone : tone;   // default: lit skin = light, like a positive photo
+      const e = clamp01(mag[i] / em), d = clamp01(dark[i] / ed), hl = clamp01(lite[i] / ed);
+      // inner features (dark lines, highlights) count more than plain edges such as the outline
+      let f = Math.max(d, 0.5 * e, 0.5 * hl) * (0.35 + 0.65 * subj[i]);
+      // recognised: the landmark lines lead, part borders next, the photo's own detail fills in
+      if (land || bnd) f = Math.max(land ? land[i] : 0, bnd ? 0.6 * bnd[i] : 0, f * (land ? 0.4 : 0.75) * region[i]);
+      feat[i] = f;
+      a[i] = 255 * clamp01((1 - S.detail) * t * subj[i] * region[i] + S.detail * f * 1.2);
+      if (mag[i] > 1e-6) { const s = Math.max(e, d) / Math.hypot(gx[i], gy[i]); field[i * 2] = -gy[i] * s; field[i * 2 + 1] = gx[i] * s; }
+    }
+    return { a, feat, field, tone: L, cat: regions ? cat : null };
+  }
+
+  // target points, bucketed so a light can hop to a nearby one
+  function makePool(pts, B) {
+    const bw = Math.ceil(W / B), bh = Math.ceil(H / B), buckets = Array.from({ length: bw * bh }, () => []);
+    for (let k = 0; k < pts.length; k += 2) {
+      const bx = Math.min(bw - 1, Math.max(0, pts[k] / B | 0)), by = Math.min(bh - 1, Math.max(0, pts[k + 1] / B | 0));
+      buckets[by * bw + bx].push(k);
+    }
+    return { pts, B, bw, bh, buckets };
+  }
+  let pool = { pts: [], B: 26, bw: 0, bh: 0, buckets: [] }, fpool = null;
+  // portraits: part of the lights (more with a higher Detail) only trace the features, the rest
+  // paint the light on the face
+  const poolOf = (p) => fpool && p.seed < 1000 * Math.min(0.8, Math.max(0.2, S.detail * 0.85)) ? fpool : pool;
+
   function buildMask() {
     const s = Math.min(W * 0.86 / ART.w, H * 0.66 / ART.h);
     unit = s;
-    const STEP = 3;
+    const photo = !!upload && S.imgMode === 'photo';
+    const STEP = photo ? 2 : 3;   // photos: a finer grid keeps the small features
     const c = mk(Math.ceil(W / STEP), Math.ceil(H / STEP)), x = c.getContext('2d', { willReadFrequently: true });
     x.fillStyle = '#fff';
-    let em;   // letter size in px: sets how far SMOOTH rounds the shapes
-    if (ownText()) em = drawText(x, STEP);
+    let em, rect;   // em: letter size in px, sets how far SMOOTH rounds the shapes
+    imgRect = null;
+    if (upload) ({ em, rect } = drawUpload(x, STEP));
+    else if (ownText()) em = drawText(x, STEP);
     else {
       const ox = (W - ART.w * s) / 2 - ART.x * s, oy = (H - ART.h * s) / 2 - ART.y * s;
       x.setTransform(s / STEP, 0, 0, s / STEP, ox / STEP, oy / STEP);
@@ -281,38 +735,114 @@
       em = 125 * s;
     }
     const n = c.width * c.height, data = x.getImageData(0, 0, c.width, c.height).data;
-    const a = new Float32Array(n);
-    for (let i = 0; i < n; i++) a[i] = data[i * 4 + 3];
+    let a, feat = null;
+    flow = null; flowW = c.width; flowStep = STEP;
+    toneGrid = null; catGrid = null;
+    if (photo) ({ a, feat, field: flow, tone: toneGrid, cat: catGrid } = photoWeights(data, c.width, c.height, rect));
+    else if (upload) a = uploadWeights(data, n);
+    else { a = new Float32Array(n); for (let i = 0; i < n; i++) a[i] = data[i * 4 + 3]; }
     // smooth: blur then threshold at the middle = corners and joins melt into round shapes
-    const r = Math.round(S.smooth * em * 0.1 / STEP);
+    const r = photo ? 0 : Math.round(S.smooth * em * 0.1 / STEP);
     if (r > 0) boxBlur(a, c.width, c.height, r);
-    const thr = r > 0 ? 115 : 140;
-    mask = [];
+    const thr = upload ? S.threshold * 255 : r > 0 ? 115 : 140;
+    const pts = [], fpts = [];
     for (let j = 0; j < c.height; j++) for (let i = 0; i < c.width; i++) {
-      if (a[j * c.width + i] > thr) mask.push((i + 0.5) * STEP, (j + 0.5) * STEP);
+      const k = j * c.width + i, v = a[k];
+      // photo: a cell joins with a chance that follows its weight, so the face keeps its shading
+      if (photo ? v > 0 && hash(i, j) < Math.pow(v / 255, S.contrast) : v > thr) pts.push((i + 0.5) * STEP, (j + 0.5) * STEP);
+      if (feat && feat[k] > 0.22 && hash(j + 7919, i) < Math.pow(feat[k], 1.3)) fpts.push((i + 0.5) * STEP, (j + 0.5) * STEP);
     }
-    BUCKET = Math.max(14, s * 22);
-    bw = Math.ceil(W / BUCKET); bh = Math.ceil(H / BUCKET);
-    buckets = Array.from({ length: bw * bh }, () => []);
-    for (let k = 0; k < mask.length; k += 2) buckets[(mask[k + 1] / BUCKET | 0) * bw + (mask[k] / BUCKET | 0)].push(k);
-    for (const p of P) p.tgt = randomTarget();
+    // photos hop between nearer points, so strokes stay at the size of a feature
+    pool = makePool(pts, photo ? Math.max(8, s * 10) : Math.max(14, s * 22));
+    fpool = fpts.length > 100 ? makePool(fpts, Math.max(6, s * 6)) : null;
+    shapeGrid = new Float32Array(n);
+    for (let i = 0; i < n; i++) shapeGrid[i] = Math.min(1, a[i] / 255);
+    if (!toneGrid) toneGrid = shapeGrid;
+    // Network: ~700 fixed nodes picked from the shape (stable, so the same edges glow up again)
+    const all = pts.concat(fpts), nn = all.length / 2, keep = Math.min(1, 700 / Math.max(1, nn)), nodes = [];
+    for (let q = 0; q < nn; q++) if (hash(q, 4243) < keep) nodes.push(all[q * 2], all[q * 2 + 1]);
+    npool = nodes.length > 8 ? makePool(nodes, Math.max(12, s * 16)) : null;
+    for (const p of P) { const pl = poolOf(p); p.tgt = (Math.random() * (pl.pts.length / 2) | 0) * 2; }
   }
   // text needs its font weight loaded first; a newer request wins over a slower older one
   let maskToken = 0, maskTimer = 0;
   async function rebuildMask() {
     const token = ++maskToken;
-    if (ownText()) { try { await document.fonts.load(fontOf(100), S.text || 'A'); } catch (e) {} }
-    if (token === maskToken && W) buildMask();
+    if (!upload && ownText()) { try { await document.fonts.load(fontOf(100), S.text || 'A'); } catch (e) {} }
+    if (token === maskToken && W) { buildMask(); if (!playing) seekPending = -1; }
   }
   const scheduleMask = () => { clearTimeout(maskTimer); maskTimer = setTimeout(rebuildMask, 120); };
-  const randomTarget = () => (Math.random() * (mask.length / 2) | 0) * 2;
-  function nearbyTarget(k) {
-    const bx = mask[k] / BUCKET | 0, by = mask[k + 1] / BUCKET | 0;
+  const randomTarget = (pl) => (R() * (pl.pts.length / 2) | 0) * 2;
+
+  // string-art portraits (after Espen Kluge's "Alternatives"): straight chords between points of
+  // matching tone. A chord is only taken if its ends and the stretch between them stay in the same
+  // tone and the same recognised part, so lines never cross an edge and the features emerge from
+  // where the lines run
+  const cellOf = (x, y) => {
+    const i = Math.min(flowW - 1, Math.max(0, x / flowStep | 0)), j = Math.max(0, y / flowStep | 0);
+    return Math.min(toneGrid.length - 1, j * flowW + i);
+  };
+  const CHORD_SAMPLES = [0.15, 0.3, 0.45, 0.6, 0.75, 0.9];
+  function chordTarget(pl, k, fine, net) {
+    const x0 = pl.pts[k], y0 = pl.pts[k + 1], c0 = cellOf(x0, y0), t0 = toneGrid[c0], g0 = catGrid ? catGrid[c0] : 0;
+    const L = S.styleLength, strict = 0.4 + 1.6 * S.stylePrecision;
+    const maxR = (net ? 34 : fine ? 30 : 140) * unit * L, minR = (net ? 4 : fine ? 6 : 18) * unit * Math.min(1, L);
+    const nb = Math.ceil(maxR / pl.B);
+    const bx = x0 / pl.B | 0, by = y0 / pl.B | 0;
+    let best = -1, bs = 1e9;
+    for (let t = 0; t < 16; t++) {
+      const xx = bx + Math.round((R() * 2 - 1) * nb), yy = by + Math.round((R() * 2 - 1) * nb);
+      if (xx < 0 || yy < 0 || xx >= pl.bw || yy >= pl.bh) continue;
+      const b = pl.buckets[yy * pl.bw + xx];
+      if (!b.length) continue;
+      const c = b[R() * b.length | 0], cx = pl.pts[c], cy = pl.pts[c + 1], d = Math.hypot(cx - x0, cy - y0);
+      if (d < minR || d > maxR) continue;
+      let diff = Math.abs(toneGrid[cellOf(cx, cy)] - t0);
+      for (const q of CHORD_SAMPLES) {
+        const m = cellOf(x0 + (cx - x0) * q, y0 + (cy - y0) * q);
+        diff = Math.max(diff, Math.abs(toneGrid[m] - t0) * 0.85, (1 - shapeGrid[m]) * 0.6);
+        if (catGrid && catGrid[m] !== g0) diff += 0.35;   // leaving hair for face, face for clothes…
+      }
+      // strings: among equals the longer chord; network: the nearer node, so it meshes like a web
+      const score = diff * strict + (net ? (d / maxR) * 0.5 : -(d / maxR) * 0.1);
+      if (score < bs) { bs = score; best = c; }
+    }
+    return best < 0 ? nearbyTarget(pl, k) : best;
+  }
+  // Hatching / Scanlines: straight strokes along parallel lines (spacing apart) across the shape.
+  // A stroke starts on a random shape point snapped to its line and stops where the shape (or, at
+  // high precision, the tone) changes; then the pen lifts and starts somewhere else
+  function lineStep(p, pl, f, t) {
+    const scan = S.lineStyle === 'scan';
+    const ang = scan ? 0 : (S.styleAngle + (S.styleCross && p.seed % 2 < 1 ? 90 : 0)) * Math.PI / 180;
+    const cx = Math.cos(ang), cy = Math.sin(ang), sp = S.styleSpacing * unit * 0.8;
+    const tol = 0.55 - 0.47 * S.stylePrecision;
+    const wob = (x, u) => scan ? Math.sin(x * 0.045 / unit + t * 2.3 + u * 0.7) * S.styleWobble * sp * 0.45 : 0;
+    if (p.aux === 0) {   // new stroke: lift the pen (no line drawn)
+      const k = randomTarget(pl);
+      let x = pl.pts[k], y = pl.pts[k + 1];
+      const u = -x * cy + y * cx, us = Math.round(u / sp) * sp;
+      x += (us - u) * -cy; y += (us - u) * cx;
+      p.x = p.px = x; p.y = p.py = y + wob(x, us); p.ux = us;
+      p.aux = (scan ? 260 : 90) * unit * S.styleLength * (0.5 + R()) * (R() < 0.5 ? -1 : 1);
+      p.aux2 = toneGrid[cellOf(x, y)];
+      return;
+    }
+    const dir = Math.sign(p.aux), step = unit * (scan ? 7 : 5) * p.speed * f;
+    const nx = p.x + cx * step * dir, base = p.y - wob(p.x, p.ux), ny = base + cy * step * dir + wob(nx, p.ux);
+    const c = cellOf(nx, ny);
+    if (shapeGrid[c] < 0.08 || Math.abs(toneGrid[c] - p.aux2) > tol || nx < 0 || ny < 0 || nx > W || ny > H) { p.aux = 0; return; }
+    p.x = nx; p.y = ny;
+    p.aux -= step * dir;
+    if (Math.sign(p.aux) !== dir) p.aux = 0;
+  }
+  function nearbyTarget(pl, k) {
+    const bx = pl.pts[k] / pl.B | 0, by = pl.pts[k + 1] / pl.B | 0;
     for (let tries = 0; tries < 6; tries++) {
-      const xx = bx + (Math.random() * 3 | 0) - 1, yy = by + (Math.random() * 3 | 0) - 1;
-      if (xx < 0 || yy < 0 || xx >= bw || yy >= bh) continue;
-      const b = buckets[yy * bw + xx];
-      if (b.length) return b[Math.random() * b.length | 0];
+      const xx = bx + (R() * 3 | 0) - 1, yy = by + (R() * 3 | 0) - 1;
+      if (xx < 0 || yy < 0 || xx >= pl.bw || yy >= pl.bh) continue;
+      const b = pl.buckets[yy * pl.bw + xx];
+      if (b.length) return b[R() * b.length | 0];
     }
     return k;
   }
@@ -325,9 +855,13 @@
     p.life = rnd(4, 12);
   }
   function newLight() {
-    const p = { col: pickColor(), wide: Math.random() < 0.25, ambient: Math.random() < AMBIENT, speed: rnd(0.7, 1.4), seed: rnd(1000), layer: Math.random() * 3 | 0 };
-    spawn(p);
-    p.tgt = randomTarget();
+    const M = Math.random;   // not part of a step: keeps the replay random stream untouched
+    const p = { col: pickColor(), wide: M() < 0.25, ambient: M() < AMBIENT, speed: 0.7 + M() * 0.7, seed: M() * 1000, layer: M() * 3 | 0 };
+    p.x = (-0.1 + M() * 1.2) * W; p.y = (-0.1 + M() * 1.2) * H;
+    p.px = p.x; p.py = p.y; p.vx = 0; p.vy = 0;
+    p.life = 4 + M() * 8;
+    p.aux = 0; p.aux2 = 0; p.ux = 0;   // hatching / scanlines: current stroke
+    p.tgt = (M() * (poolOf(p).pts.length / 2) | 0) * 2;
     return p;
   }
   // density changes add or drop lights instead of restarting them all
@@ -354,19 +888,50 @@
   function setBg() {
     const h = parseInt(S.bg.slice(1), 16);
     lightBg = (0.2126 * (h >> 16) + 0.7152 * ((h >> 8) & 255) + 0.0722 * (h & 255)) / 255 > 0.55;
-    document.body.style.background = S.bg;
+    document.body.style.background = framed ? '#0b0b0e' : S.bg;   // framed: dark letterbox around the image
   }
 
+  // ---------- output size ----------
+  const SIZES = { ig_post: [1080, 1080], ig_portrait: [1080, 1350], story: [1080, 1920], fb: [1200, 630], x: [1600, 900],
+                  linkedin: [1200, 627], yt: [1280, 720], pin: [1000, 1500] };
+  const clampPx = (v) => Math.round(Math.min(4096, Math.max(200, +v || 1080)));
+  const outSize = () => S.size === 'custom' ? [clampPx(S.cw), clampPx(S.ch)] : SIZES[S.size] || null;
+
+  // rebuilds the simulation. A preset renders at exactly its pixels; the simulation runs in units
+  // sized like a typical desktop screen, so every format gets the same density and line weight
   function resize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    const out = outSize();
+    framed = !!out;
+    if (out) {
+      dpr = Math.sqrt(out[0] * out[1] / (1376 * 860));
+      W = out[0] / dpr; H = out[1] / dpr;
+      canvas.width = out[0]; canvas.height = out[1];
+    } else {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = Math.max(1, window.innerWidth); H = Math.max(1, window.innerHeight);   // a hidden window can report 0
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    }
     trail = mk(canvas.width, canvas.height); tCtx = trail.getContext('2d');
-    tCtx.fillStyle = '#000'; tCtx.fillRect(0, 0, trail.width, trail.height);
+    clearTrail();
     P = [];
-    buildLights();
     buildMask();
-    if (ownText()) rebuildMask();
+    buildLights();
+    if (ownText() && !upload) rebuildMask();
+    resetHistory();
+    layout();
+    setBg();
+    sizeOut.textContent = `${canvas.width} × ${canvas.height} px`;
+  }
+  const clearTrail = () => { tCtx.globalCompositeOperation = 'source-over'; tCtx.fillStyle = '#000'; tCtx.fillRect(0, 0, trail.width, trail.height); };
+  // where the frame sits in the window (display only — the simulation is untouched)
+  function layout() {
+    canvas.classList.toggle('framed', framed);
+    if (!framed) { canvas.style.cssText = ''; return; }
+    const top = 84, bottom = 76, side = 16;
+    const aw = window.innerWidth - 2 * side, ah = window.innerHeight - top - bottom;
+    const k = Math.min(aw / canvas.width, ah / canvas.height);
+    const w = canvas.width * k, h = canvas.height * k;
+    canvas.style.cssText = `inset:auto;left:${(window.innerWidth - w) / 2}px;top:${top + (ah - h) / 2}px;width:${w}px;height:${h}px`;
   }
 
   // smooth swirling flow (sum of sines, no seams); three offset layers make crossing streams
@@ -384,8 +949,8 @@
   // ---------- timeline ----------
   const CYCLE = FREE + GATHER + HOLD + RELEASE;
   let clock = 0;
-  function pull() {   // 0: lights roam freely, 1: lights live inside the letters
-    const c = clock % CYCLE;
+  function pull(t = clock) {   // 0: lights roam freely, 1: lights live inside the letters
+    const c = t % CYCLE;
     if (c < FREE) return 0;
     if (c < FREE + GATHER) return smooth((c - FREE) / GATHER);
     if (c < FREE + GATHER + HOLD) return 1;
@@ -396,12 +961,10 @@
     clock = c < FREE ? base + FREE : c < FREE + GATHER + HOLD ? base + FREE + GATHER + HOLD : base + CYCLE;
   });
 
-  // ---------- frame ----------
+  // ---------- one simulation step (fixed 1/60 s × speed) ----------
   let groups = [];   // [thin, wide] segment lists per colour
-  let last = performance.now();
-  function frame(ms) {
-    const dt = Math.min(0.05, (ms - last) / 1000) * S.speed;
-    last = ms;
+  let lastK = 0, lastMotion = 0;
+  function doStep(dt, draw) {
     clock += dt;
     const t = clock;
     const k = pull();
@@ -412,41 +975,103 @@
     for (const g of groups) { g[0].length = 0; g[1].length = 0; }
     for (const p of P) {
       p.px = p.x; p.py = p.y;
-      const kk = p.ambient ? 0 : k;
+      // Focus: the share of lights that join the image (the rest keep drifting through the dark)
+      const kk = (p.seed * 7.137) % 1 < 1 - S.styleFocus ? 0 : k;
       const a = flowAngle(p.x, p.y, t, p.seed, p.layer);
       const sp = base * p.speed * (1 + 0.6 * Math.sin(t * 0.7 + p.seed));
       let ax = Math.cos(a) * sp, ay = Math.sin(a) * sp;
-      if (kk > 0 && mask.length) {
+      const pl = poolOf(p);
+      let walked = false, node = false;
+      const style = S.lineStyle;
+      if (kk > 0.6 && toneGrid && (style === 'strings' || style === 'network') && pl.pts.length) {
+        // strings / network: run straight along the chord at an even pace, pick the next at its end
+        const net = style === 'network' && npool, g = net ? npool : pl;
+        if (p.tgt >= g.pts.length) p.tgt = randomTarget(g);
+        const tx = g.pts[p.tgt], ty = g.pts[p.tgt + 1], dx = tx - p.x, dy = ty - p.y, dd = Math.hypot(dx, dy) || 1;
+        const stride = unit * (net ? 4 : pl === fpool ? 3.5 : 8) * p.speed * f;
+        if (dd <= stride) { p.x = tx; p.y = ty; p.tgt = chordTarget(g, p.tgt, !net && pl === fpool, !!net); node = !!net; }
+        else { p.x += dx / dd * stride; p.y += dy / dd * stride; }
+        p.vx = (p.x - p.px) / (f * 6); p.vy = (p.y - p.py) / (f * 6);
+        walked = true;
+      } else if (kk > 0.6 && toneGrid && (style === 'hatch' || style === 'scan') && pl.pts.length) {
+        lineStep(p, pl, f, t);
+        p.vx = (p.x - p.px) / (f * 6); p.vy = (p.y - p.py) / (f * 6);
+        walked = true;
+      } else if (kk > 0.6 && pl === fpool) {
+        // portraits: feature lights walk like a pen. Each step goes to the nearby feature point most
+        // in line with the current heading, so lids, glasses, brows and the lip line come out as lines
+        const stride = unit * 3.2 * p.speed * f;
+        let hx = p.vx, hy = p.vy;
+        const hl = Math.hypot(hx, hy);
+        if (hl < 1e-6) { const a0 = R() * 6.2832; hx = Math.cos(a0); hy = Math.sin(a0); } else { hx /= hl; hy /= hl; }
+        let best = p.tgt, bs = -1e9;
+        for (let t = 0; t < 6; t++) {
+          const c = nearbyTarget(pl, p.tgt), dx = pl.pts[c] - p.x, dy = pl.pts[c + 1] - p.y, dd = Math.hypot(dx, dy);
+          if (dd < 0.5) continue;
+          const score = (dx * hx + dy * hy) / dd - Math.abs(dd - stride * 2) / (stride * 4);
+          if (score > bs) { bs = score; best = c; }
+        }
+        p.tgt = best;
+        const dx = pl.pts[best] - p.x, dy = pl.pts[best + 1] - p.y, dd = Math.hypot(dx, dy) || 1, mv = Math.min(dd, stride);
+        p.vx = dx / dd * mv / (f * 6); p.vy = dy / dd * mv / (f * 6);
+        p.x += dx / dd * mv; p.y += dy / dd * mv;
+        if (R() < 0.004) {   // now and then lift the pen and start on another feature (no line drawn)
+          p.tgt = randomTarget(pl); p.x = pl.pts[p.tgt]; p.y = pl.pts[p.tgt + 1]; p.px = p.x; p.py = p.y;
+        }
+        walked = true;
+      } else if (kk > 0 && pl.pts.length) {
         // scribble inside the letters: chase a target point, hop to a neighbour on arrival
-        const tx = mask[p.tgt], ty = mask[p.tgt + 1];
+        const tx = pl.pts[p.tgt], ty = pl.pts[p.tgt + 1];
         const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy) || 1;
-        if (d < 3 * unit + 2) p.tgt = nearbyTarget(p.tgt);
-        const pullSp = Math.min(d * 0.12, base * 2.4 * p.speed);
+        // portraits: feature lights take short, slow strokes so a lid or a lip stays a line
+        const fine = pl === fpool, photoLight = !!flow;
+        // photos: hop on once within a step of the point, so a light never circles around it
+        const reach = photoLight ? Math.hypot(p.vx, p.vy) * f * 6 * 1.2 : 0;
+        if (d < Math.max((fine ? 4 : 3) * unit + 2, reach)) p.tgt = nearbyTarget(pl, p.tgt);
+        const pullSp = Math.min(d * 0.12, base * (fine ? 0.55 : photoLight ? 0.9 : 2.4) * p.speed);
         ax = ax * (1 - kk) + (dx / d) * pullSp * kk;
         ay = ay * (1 - kk) + (dy / d) * pullSp * kk;
+        if (flow) {
+          // portraits: glide along the nearest contour (eyelid, lip, jaw), in the direction already travelled
+          const ci = (p.y / flowStep | 0) * flowW + (p.x / flowStep | 0);
+          if (p.x >= 0 && p.y >= 0 && p.x < W && ci < flow.length / 2) {
+            let fx = flow[ci * 2], fy = flow[ci * 2 + 1];
+            if (fx * p.vx + fy * p.vy < 0) { fx = -fx; fy = -fy; }
+            const fs = base * (fine ? 0.5 : 1) * p.speed * kk;
+            ax += fx * fs; ay += fy * fs;
+          }
+        }
       }
-      const damp = 0.86 - 0.1 * k;
-      p.vx = p.vx * damp + ax * (1 - damp);
-      p.vy = p.vy * damp + ay * (1 - damp);
-      p.x += p.vx * f * 6; p.y += p.vy * f * 6;
+      if (!walked) {
+        const damp = (flow ? 0.7 : 0.86) - 0.1 * k;
+        p.vx = p.vx * damp + ax * (1 - damp);
+        p.vy = p.vy * damp + ay * (1 - damp);
+        p.x += p.vx * f * 6; p.y += p.vy * f * 6;
+      }
       motion += Math.abs(p.vx) + Math.abs(p.vy);
       p.life -= dt;
       const out = p.x < -0.15 * W || p.x > 1.15 * W || p.y < -0.15 * H || p.y > 1.15 * H;
-      if (out || (p.life < 0 && kk < 0.05)) { spawn(p); if (!kk) p.tgt = randomTarget(); continue; }
-      groups[p.col][p.wide ? 1 : 0].push(p.px, p.py, p.x, p.y);
+      if (out || (p.life < 0 && kk < 0.05)) { spawn(p); if (!kk) p.tgt = randomTarget(pl); continue; }
+      if (draw) {
+        groups[p.col][p.wide ? 1 : 0].push(p.px, p.py, p.x, p.y);
+        // network: a node lights up where a line arrives
+        if (node && R() < S.styleNodes) groups[p.col][1].push(p.x - 0.01, p.y, p.x + 0.01, p.y);
+      }
     }
+    lastK = k; lastMotion = motion / (P.length * base * 1.3 + 1e-6);
+    if (!draw) return;
 
     // exposure: old light fades slowly, new light adds up
     tCtx.globalCompositeOperation = 'source-over';
-    tCtx.fillStyle = `rgba(0,0,0,${Math.min(1, FADE / S.trail * f)})`;
+    tCtx.fillStyle = `rgba(0,0,0,${Math.min(1, fadeRate() * f)})`;
     tCtx.fillRect(0, 0, trail.width, trail.height);
     tCtx.globalCompositeOperation = 'lighter';
     tCtx.lineCap = 'round';
     groups.forEach((g, ci) => {
       g.forEach((seg, wide) => {
         if (!seg.length) return;
-        tCtx.lineWidth = (wide ? 2.6 : 1.1) * dpr * Math.max(0.8, unit * 1.2) * S.thickness;
-        tCtx.strokeStyle = `rgba(${lightBg ? COLORS[ci].ink : COLORS[ci].c},${Math.min(1, (wide ? 0.2 : 0.45) * S.intensity)})`;
+        tCtx.lineWidth = (wide ? 2.6 : 1.1) * dpr * Math.max(0.8, unit * 1.2) * S.thickness * (flow ? 0.6 : 1);
+        tCtx.strokeStyle = `rgba(${lightBg ? COLORS[ci].ink : COLORS[ci].c},${Math.min(1, (wide ? 0.2 : 0.45) * S.intensity * (flow ? PHOTO_LIGHT : 1))})`;
         tCtx.beginPath();
         for (let i = 0; i < seg.length; i += 4) {
           tCtx.moveTo(seg[i] * dpr, seg[i + 1] * dpr);
@@ -455,8 +1080,11 @@
         tCtx.stroke();
       });
     });
+  }
 
-    // compose: bloom + crisp exposure
+  // ---------- compose: bloom + crisp exposure (every display frame, also while paused) ----------
+  function compose() {
+    const glowPx = Math.min(W, H) * dpr;   // blur scales with the frame, so preview = export
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.filter = 'none';
@@ -466,10 +1094,10 @@
     const ink = lightBg ? ' invert(1)' : '';   // absorbed light -> ink multiplied onto the paper
     if (S.glow > 0) {
       ctx.globalAlpha = Math.min(1, 0.85 * S.glow);
-      ctx.filter = `contrast(1.25)${ink} blur(${12 * dpr}px)`;
+      ctx.filter = `contrast(1.25)${ink} blur(${glowPx * 0.014}px)`;
       ctx.drawImage(trail, 0, 0);
       ctx.globalAlpha = Math.min(1, 0.7 * S.glow);
-      ctx.filter = `contrast(1.25)${ink} blur(${3 * dpr}px)`;
+      ctx.filter = `contrast(1.25)${ink} blur(${glowPx * 0.0035}px)`;
       ctx.drawImage(trail, 0, 0);
     }
     ctx.filter = `contrast(1.25)${ink}`;   // also clips the faint residue a slow 8-bit fade never clears
@@ -486,7 +1114,99 @@
     ctx.fillStyle = v;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    sound.update(k, motion / (P.length * base * 1.3 + 1e-6));
+    // the real photo: faded in over the whole image (opacity), and/or fully shown from the left
+    // edge up to the reveal line
+    if (upload && imgRect && (S.photoMix > 0 || S.photoWipe > 0)) {
+      const rx = imgRect.x * dpr, ry = imgRect.y * dpr, rw = imgRect.w * dpr, rh = imgRect.h * dpr;
+      ctx.imageSmoothingQuality = 'high';
+      if (S.photoMix > 0) { ctx.globalAlpha = S.photoMix; ctx.drawImage(upload.img, rx, ry, rw, rh); ctx.globalAlpha = 1; }
+      if (S.photoWipe > 0) {
+        const cut = rw * S.photoWipe;
+        ctx.drawImage(upload.img, 0, 0, upload.img.width * S.photoWipe, upload.img.height, rx, ry, cut, rh);
+        if (S.photoWipe < 1) {   // a thin glowing seam where photo and light meet
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.shadowColor = 'rgba(255,60,60,0.9)'; ctx.shadowBlur = 8 * dpr;
+          ctx.fillRect(rx + cut - dpr, ry, 2 * dpr, rh);
+          ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+        }
+      }
+    }
+  }
+
+  // ---------- history: snapshots + per-step log, so any of the last 60 s can be rebuilt ----------
+  const HIST = 3600, LOGN = 8192, SNAP = 30, FIELDS = 17;
+  const clockLog = new Float64Array(LOGN), dtLog = new Float32Array(LOGN);
+  let stepN = 0, headN = 0, snaps = [], playing = true, seekPending = null;   // step to rebuild next frame; -1 = redraw the current one
+  const resetHistory = () => { stepN = 0; headN = 0; snaps = []; };
+  function snapshot() {
+    const d = new Float64Array(P.length * FIELDS);
+    P.forEach((p, i) => {
+      d.set([p.x, p.y, p.px, p.py, p.vx, p.vy, p.life, p.tgt, p.col, +p.wide, +p.ambient, p.speed, p.seed, p.layer, p.aux, p.aux2, p.ux], i * FIELDS);
+    });
+    return { n: stepN, clock, rng, d };
+  }
+  function restore(s) {
+    const d = s.d;
+    P = [];
+    for (let o = 0; o < d.length; o += FIELDS) {
+      const p = {
+        x: d[o], y: d[o + 1], px: d[o + 2], py: d[o + 3], vx: d[o + 4], vy: d[o + 5], life: d[o + 6],
+        tgt: d[o + 7], col: d[o + 8] < COLORS.length ? d[o + 8] : 0,
+        wide: !!d[o + 9], ambient: !!d[o + 10], speed: d[o + 11], seed: d[o + 12], layer: d[o + 13],
+        aux: d[o + 14], aux2: d[o + 15], ux: d[o + 16],
+      };
+      if (p.tgt >= poolOf(p).pts.length) p.tgt = 0;
+      P.push(p);
+    }
+    clock = s.clock; rng = s.rng; stepN = s.n;
+  }
+  function liveStep(dt) {
+    if (stepN < headN) { snaps = snaps.filter(s => s.n <= stepN); headN = stepN; }   // a new future replaces the old one
+    if (stepN % SNAP === 0 && !(snaps.length && snaps[snaps.length - 1].n === stepN)) snaps.push(snapshot());
+    clockLog[stepN % LOGN] = clock; dtLog[stepN % LOGN] = dt;
+    doStep(dt, true);
+    headN = ++stepN;
+    const oldest = headN - HIST - 450;
+    while (snaps.length > 1 && snaps[1].n <= oldest) snaps.shift();
+  }
+  // rebuild step `target`: restore an earlier snapshot, replay the logged steps silently, and draw
+  // only the last stretch the fading exposure still remembers
+  function seekTo(target) {
+    target = Math.max(Math.max(0, headN - HIST), Math.min(headN, Math.round(target)));
+    if (!snaps.length) return;
+    const fade = fadeRate() * S.speed;
+    const warm = Math.min(450, Math.ceil(5 / Math.max(0.005, fade)));
+    let s = snaps[0];
+    for (let i = snaps.length - 1; i >= 0; i--) if (snaps[i].n <= target - warm) { s = snaps[i]; break; }
+    restore(s);
+    clearTrail();
+    for (let n = s.n; n < target; n++) { clock = clockLog[n % LOGN]; doStep(dtLog[n % LOGN], n >= target - warm); }
+    stepN = target;
+  }
+  function stepBy(d) {   // ±steps while paused; past the newest step it simply simulates ahead
+    setPlaying(false);
+    if (seekPending !== null && seekPending >= 0) seekTo(seekPending);   // finish a scrub first
+    seekPending = null;
+    const t = stepN + d;
+    if (t <= headN) seekTo(t);
+    else { if (stepN !== headN) seekTo(headN); while (stepN < t) liveStep(S.speed / 60); }
+  }
+
+  // ---------- frame ----------
+  let last = performance.now(), acc = 0;
+  function frame(ms) {
+    const real = Math.min(0.25, (ms - last) / 1000);
+    last = ms;
+    if (playing) {
+      acc += real;
+      let n = 0;
+      while (acc >= 1 / 60 && n < 4) { liveStep(S.speed / 60); acc -= 1 / 60; n++; }
+      if (n === 4) acc = 0;   // a slow device drops time instead of spiralling
+      sound.update(lastK, lastMotion);
+    }
+    if (seekPending !== null) { seekTo(seekPending < 0 ? stepN : seekPending); seekPending = null; }
+    compose();
+    updateTimeline();
     requestAnimationFrame(frame);
   }
 
@@ -494,7 +1214,7 @@
   const queueResize = () => {
     if (resizeQueued) return;
     resizeQueued = true;
-    requestAnimationFrame(() => { resizeQueued = false; resize(); });
+    requestAnimationFrame(() => { resizeQueued = false; if (framed) layout(); else resize(); });
   };
   window.addEventListener('resize', queueResize);
   window.addEventListener('orientationchange', queueResize);
@@ -512,7 +1232,7 @@
   // all synthesised (Web Audio): low detuned pad, airy noise "whoosh" driven by how fast the
   // lights move, and a high shimmer chord that rises while SOURCE LOST is written
   const sound = (() => {
-    let ac = null, master, padFilter, noiseFilter, noiseGain, shimmerGain, on = false;
+    let ac = null, master, padFilter, noiseFilter, noiseGain, shimmerGain, on = false, paused = false;
     function init() {
       ac = new (window.AudioContext || window.webkitAudioContext)();
       master = ac.createGain(); master.gain.value = 0;
@@ -569,8 +1289,12 @@
         if (!ac) init();
         on = !on;
         if (on) ac.resume();
-        master.gain.setTargetAtTime(on ? 0.9 : 0, ac.currentTime, on ? 0.6 : 0.15);
+        master.gain.setTargetAtTime(on && !paused ? 0.9 : 0, ac.currentTime, on ? 0.6 : 0.15);
         return on;
+      },
+      setPaused(p) {   // the timeline is stopped: hold the sound too
+        paused = p;
+        if (ac && on) master.gain.setTargetAtTime(p ? 0 : 0.9, ac.currentTime, 0.15);
       },
       update(k, motion) {
         if (!on) return;
@@ -601,33 +1325,277 @@
   window.addEventListener('keydown', e => { if (e.key === 'Escape' && !panel.hidden) { setOpen(false); menuBtn.focus(); } });
 
   const inputs = [...panel.querySelectorAll('[data-k]')];
-  const fmt = (k, v) => k === 'bg' || k === 'custom' ? v.toUpperCase() : k === 'smooth' || k === 'spacing' ? v.toFixed(2) : `${v.toFixed(2)}×`;
+  const sizeOut = document.getElementById('sizeout');
+  const fmt = (k, v) => k === 'bg' || k === 'custom' ? v.toUpperCase()
+    : ['smooth', 'spacing', 'threshold', 'detail'].includes(k) ? v.toFixed(2)
+    : ['photoMix', 'photoWipe', 'styleFocus', 'stylePrecision', 'styleWobble', 'styleNodes'].includes(k) ? `${Math.round(v * 100)}%`
+    : k === 'styleSpacing' ? `${v} px` : k === 'styleAngle' ? `${v}°` : `${v.toFixed(2)}×`;
+  const imgCtl = document.getElementById('imgctl');
   function syncUI() {
     for (const el of inputs) {
-      if (el !== document.activeElement) el.value = S[el.dataset.k];   // keeps the caret while typing
-      const out = el.parentElement.querySelector('output');
-      if (out) out.textContent = fmt(el.dataset.k, el.type === 'range' ? +S[el.dataset.k] : S[el.dataset.k]);
+      const k = el.dataset.k;
+      if (el.type === 'checkbox') el.checked = !!S[k];
+      else if (el !== document.activeElement) el.value = S[k];   // keeps the caret while typing
+      const out = el.type === 'range' && el.parentElement.querySelector('output');
+      const swatch = el.type === 'color' && el.parentElement.querySelector('output');
+      if (out) out.textContent = fmt(k, +S[k]);
+      if (swatch) swatch.textContent = fmt(k, S[k]);
     }
-    panel.querySelector('[data-show="custom"]').hidden = S.palette !== 'custom';
+    const show = {
+      custom: S.palette === 'custom', customsize: S.size === 'custom', upload: !!upload,
+      silhouette: S.imgMode !== 'photo', photo: S.imgMode === 'photo',
+      shaped: S.lineStyle !== 'trails', lined: S.lineStyle === 'hatch' || S.lineStyle === 'scan',
+      hatch: S.lineStyle === 'hatch', scan: S.lineStyle === 'scan', network: S.lineStyle === 'network', pdfpage: !!(upload && pdfDoc && pdfDoc.numPages > 1),
+    };
+    panel.querySelectorAll('[data-show]').forEach(el => { el.hidden = !show[el.dataset.show]; });
+    for (const kind of ['raster', 'vector']) {
+      const on = !!upload && upload.kind === kind, lab = panel.querySelector(`[data-up=${kind}]`);
+      const sec = panel.querySelector(`[data-sec=${kind}]`);
+      lab.classList.toggle('on', on);
+      lab.querySelector('.name').textContent = on ? upload.name : kind === 'raster' ? 'Upload JPG / PNG' : 'Upload SVG / PDF';
+      panel.querySelector(`[data-clear=${kind}]`).hidden = !on;
+      sec.classList.toggle('active', on);   // red dot on the section title
+      if (on && imgCtl.parentElement !== sec.querySelector('.body')) sec.querySelector('.body').appendChild(imgCtl);
+    }
     panel.querySelector('textarea').style.fontWeight = S.weight;
   }
+  let resizeTimer = 0;
   function apply(k) {
-    if (['text', 'weight', 'smooth', 'spacing'].includes(k)) scheduleMask();
+    if (['text', 'weight', 'smooth', 'spacing', 'imgMode', 'threshold', 'contrast', 'detail', 'imgScale', 'invert', 'cutout', 'recognise'].includes(k)) scheduleMask();
+    if (k === 'recognise' || k === 'imgMode') ensureAnalysis();
     if (k === 'bg') setBg();
     if (k === 'palette' || k === 'custom') setPalette();
     if (k === 'density') buildLights();
+    if (k === 'size') resize();
+    if (['lineStyle', 'styleAngle', 'styleSpacing', 'styleCross'].includes(k)) for (const p of P) p.aux = 0;   // restart strokes
+    if (k === 'cw' || k === 'ch') { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 500); }
+    // paused: redraw the held frame with the new look
+    if (!playing && !['size', 'cw', 'ch', 'photoMix', 'photoWipe'].includes(k)) seekPending = -1;
     syncUI();
     save();
   }
   for (const el of inputs) el.addEventListener('input', () => {
     const k = el.dataset.k;
-    S[k] = el.type === 'range' || k === 'weight' ? +el.value : el.value;
+    S[k] = el.type === 'checkbox' ? el.checked : el.type === 'range' || el.type === 'number' || k === 'weight' ? +el.value : el.value;
     apply(k);
   });
   panel.querySelector('.reset').addEventListener('click', () => {
     Object.assign(S, DEFAULTS);
     document.activeElement?.blur();   // lets syncUI clear the text field too
-    setBg(); setPalette(); buildLights(); rebuildMask(); syncUI(); save();
+    clearUpload(false);
+    setPalette(); resize(); syncUI(); save();
+  });
+
+  // ---------- uploads: JPG / PNG (raster) and SVG / PDF (vector) ----------
+  const MAXPX = 2048;      // vectors: rasterised large so they stay sharp
+  const MAX_RASTER = 1600;  // photos: plenty for 1080-wide social formats, light on memory and recognition
+  let pdfDoc = null;
+  const setNote = (kind, text, err) => {
+    const el = panel.querySelector(`[data-note=${kind}]`);
+    el.textContent = text; el.hidden = !text; el.classList.toggle('err', !!err);
+  };
+  const fit = (w, h, max = MAXPX) => { const k = Math.min(1, max / Math.max(w, h)); return [Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))]; };
+  function hasAlpha(c) {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 3; i < d.length; i += 4 * 7) if (d[i] < 250) n++;
+    return n > d.length / 28 * 0.005;
+  }
+  async function loadRaster(file) {
+    const bmp = await createImageBitmap(file);
+    const [w, h] = fit(bmp.width, bmp.height, MAX_RASTER), c = mk(w, h);
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(bmp, 0, 0, w, h);
+    c.original = [bmp.width, bmp.height];   // for the "resized" note
+    bmp.close?.();
+    return c;
+  }
+  async function loadSvg(file) {
+    const doc = new DOMParser().parseFromString(await file.text(), 'image/svg+xml'), svg = doc.documentElement;
+    if (svg.nodeName.toLowerCase() !== 'svg') throw new Error('not an SVG');
+    let vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+    if (vb.length !== 4 || !(vb[2] > 0 && vb[3] > 0)) {
+      vb = [0, 0, parseFloat(svg.getAttribute('width')) || 1000, parseFloat(svg.getAttribute('height')) || 1000];
+      svg.setAttribute('viewBox', vb.join(' '));
+    }
+    const k = MAXPX / Math.max(vb[2], vb[3]), w = Math.round(vb[2] * k), h = Math.round(vb[3] * k);
+    svg.setAttribute('width', w); svg.setAttribute('height', h);   // rasterised large, so it stays sharp
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+    try {
+      const im = new Image();
+      im.src = url;
+      await im.decode();
+      const c = mk(w, h);
+      c.getContext('2d').drawImage(im, 0, 0, w, h);
+      return c;
+    } finally { URL.revokeObjectURL(url); }
+  }
+  // pdf.js is only fetched the first time a PDF is opened
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  let pdfjsReady = null;
+  const loadPdfJs = () => pdfjsReady ||= new Promise((ok, fail) => {
+    const s = document.createElement('script');
+    s.src = PDFJS + 'pdf.min.js';
+    s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(window.pdfjsLib); };
+    s.onerror = () => { pdfjsReady = null; fail(new Error('pdf.js did not load')); };
+    document.head.appendChild(s);
+  });
+  async function renderPdf(n) {
+    const page = await pdfDoc.getPage(n), v1 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale: MAXPX / Math.max(v1.width, v1.height) });
+    const c = mk(Math.ceil(vp.width), Math.ceil(vp.height));
+    await page.render({ canvasContext: c.getContext('2d'), viewport: vp, background: 'rgba(0,0,0,0)' }).promise;
+    return c;
+  }
+  const kindOf = (f) => /\.(svg|pdf)$/i.test(f.name) || /svg|pdf/.test(f.type) ? 'vector'
+    : /\.(png|jpe?g)$/i.test(f.name) || /^image\/(png|jpeg)$/.test(f.type) ? 'raster' : null;
+  async function useFile(file, want) {
+    const kind = kindOf(file);
+    if (!kind || (want && want !== kind)) { setNote(want || 'raster', 'Use JPG or PNG here, SVG or PDF under Vector.', true); return; }
+    setNote(kind, 'Loading…');
+    try {
+      let img, doc = null;
+      if (kind === 'raster') img = await loadRaster(file);
+      else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+        const lib = await loadPdfJs();
+        doc = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+        pdfDoc = doc;
+        img = await renderPdf(1);
+      } else img = await loadSvg(file);
+      pdfDoc = doc;
+      document.getElementById('pdfpage').value = 1;
+      document.getElementById('pdfpages').textContent = doc ? `of ${doc.numPages}` : '';
+      upload = { kind, name: file.name, img, alpha: hasAlpha(img) };
+      const [ow, oh] = img.original || [img.width, img.height];
+      upload.resized = ow !== img.width ? `Resized ${ow} × ${oh} → ${img.width} × ${img.height} px` : '';
+      // a photo gets the portrait treatment; logos, cut-outs and vectors a clean silhouette
+      S.imgMode = kind === 'raster' && !upload.alpha ? 'photo' : 'silhouette';
+      S.invert = false;
+      save();
+      panel.querySelector(`[data-sec=${kind}]`).open = true;
+      setNote('raster', ''); setNote('vector', '');
+      if (upload.resized) setNote(kind, upload.resized);
+      ensureAnalysis();
+    } catch (err) {
+      console.warn(err);
+      setNote(kind, 'This file could not be read.', true);
+      return;
+    }
+    syncUI();
+    rebuildMask();
+  }
+  // photo mode: recognise faces and people once per upload, then rebuild with what was found
+  async function ensureAnalysis() {
+    const up = upload;
+    if (!up || up.kind !== 'raster' || S.imgMode !== 'photo' || !S.recognise || up.analysis || up.analysing) return;
+    up.analysing = true;
+    const extra = up.resized ? `\n${up.resized}` : '';
+    setNote('raster', (visionReady ? 'Recognising faces and people…' : 'Loading recognition (≈30 MB, only the first time)…') + extra);
+    try {
+      const res = await analyse(up.img);
+      if (upload !== up) return;   // another file came in meanwhile
+      up.analysis = res;
+      const parts = res.found.filter(r => r !== 'background');
+      setNote('raster', (res.person
+        ? `Recognised: ${res.faces ? `${res.faces} face${res.faces > 1 ? 's' : ''} · ` : ''}${parts.join(' · ')}`
+        : 'No face or person found — drawing from the light and edges of the image.') + extra);
+      rebuildMask();
+    } catch (err) {
+      console.warn(err);
+      if (upload === up) setNote('raster', 'Recognition is unavailable (offline?) — drawing from the light and edges of the image.' + extra, true);
+    } finally { up.analysing = false; }
+  }
+  function clearUpload(rebuild = true) {
+    upload = null; pdfDoc = null;
+    panel.querySelectorAll('.file input').forEach(i => { i.value = ''; });
+    setNote('raster', ''); setNote('vector', '');
+    syncUI();
+    if (rebuild) rebuildMask();
+  }
+  panel.querySelectorAll('[data-up]').forEach(lab => lab.querySelector('input').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) useFile(f, lab.dataset.up);
+  }));
+  panel.querySelectorAll('[data-clear]').forEach(b => b.addEventListener('click', () => clearUpload()));
+  document.getElementById('pdfpage').addEventListener('change', async e => {
+    if (!pdfDoc) return;
+    const n = Math.min(pdfDoc.numPages, Math.max(1, Math.round(+e.target.value) || 1));
+    e.target.value = n;
+    upload.img = await renderPdf(n);
+    upload.alpha = hasAlpha(upload.img);
+    rebuildMask();
+  });
+  // drop a file anywhere on the page
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { if (e.dataTransfer?.types.includes('Files')) { dragDepth++; document.body.classList.add('drop'); } });
+  window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('drop'); } });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault();
+    dragDepth = 0; document.body.classList.remove('drop');
+    const f = e.dataTransfer?.files[0];
+    if (f) useFile(f);
+  });
+
+  // sections: open / closed is remembered per viewer
+  const SECTIONS = 'source-lost-06-sections';
+  try {
+    const open = JSON.parse(localStorage.getItem(SECTIONS) || 'null');
+    if (open) panel.querySelectorAll('details').forEach(d => { d.open = open.includes(d.dataset.sec); });
+  } catch (e) {}
+  panel.querySelectorAll('details').forEach(d => d.addEventListener('toggle', () => {
+    try { localStorage.setItem(SECTIONS, JSON.stringify([...panel.querySelectorAll('details[open]')].map(x => x.dataset.sec))); } catch (e) {}
+  }));
+
+  // ---------- timeline bar ----------
+  const tl = document.getElementById('tl'), scrub = tl.querySelector('input'), tlTime = tl.querySelector('output');
+  const playBtn = tl.querySelector('[data-tl=play]'), phaseCv = tl.querySelector('canvas');
+  let idleTimer = 0, scrubbing = false, phaseTick = 0;
+  function showTl() {
+    tl.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (playing) tl.classList.add('idle'); }, 3000);
+  }
+  function setPlaying(p) {
+    if (p === playing) return;
+    playing = p; acc = 0;
+    playBtn.classList.toggle('paused', !p);
+    playBtn.setAttribute('aria-label', p ? 'Pause' : 'Play');
+    sound.setPaused(!p);
+    showTl();
+  }
+  playBtn.addEventListener('click', () => setPlaying(!playing));
+  tl.querySelector('[data-tl=back]').addEventListener('click', () => stepBy(-60));
+  tl.querySelector('[data-tl=fwd]').addEventListener('click', () => stepBy(60));
+  scrub.addEventListener('pointerdown', () => { scrubbing = true; setPlaying(false); });
+  window.addEventListener('pointerup', () => { scrubbing = false; });
+  scrub.addEventListener('input', () => { setPlaying(false); seekPending = Math.max(0, headN - HIST) + +scrub.value; });
+  tl.addEventListener('dblclick', e => e.stopPropagation());
+  window.addEventListener('pointermove', showTl);
+  function updateTimeline() {
+    const lo = Math.max(0, headN - HIST);
+    scrub.max = Math.max(1, headN - lo);
+    if (!scrubbing) scrub.value = stepN - lo;
+    tlTime.textContent = stepN === headN ? (playing ? 'LIVE' : 'PAUSED') : `−${((headN - stepN) / 60).toFixed(1)} s`;
+    // track: brighter where the lights were writing the image
+    if (++phaseTick % 15) return;
+    const w = Math.max(1, Math.round(phaseCv.clientWidth)), c = phaseCv.getContext('2d');
+    if (phaseCv.width !== w) { phaseCv.width = w; phaseCv.height = 1; }
+    c.clearRect(0, 0, w, 1);
+    const span = headN - lo;
+    if (!span) return;
+    for (let x = 0; x < w; x++) {
+      const n = lo + Math.min(span - 1, Math.floor(x / w * span));
+      c.fillStyle = `rgba(255,${60 - 20 * pull(clockLog[n % LOGN])},70,${0.12 + 0.6 * pull(clockLog[n % LOGN])})`;
+      c.fillRect(x, 0, 1, 1);
+    }
+  }
+  window.addEventListener('keydown', e => {
+    if (typing(e) || (e.key === ' ' && e.target.closest?.('button'))) return;   // Space on a button clicks it
+    if (e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); stepBy(e.shiftKey ? -1 : -60); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stepBy(e.shiftKey ? 1 : 60); }
   });
 
   // ---------- screenshot: the current frame as a PNG (canvas only, no buttons) ----------
@@ -637,7 +1605,7 @@
       if (!blob) return;
       const a = document.createElement('a'), stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
       a.href = URL.createObjectURL(blob);
-      a.download = `source-lost-${stamp}.png`;
+      a.download = `source-lost-${canvas.width}x${canvas.height}-${stamp}.png`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     }, 'image/png');
@@ -649,7 +1617,6 @@
 
   // debug hook: jump the timeline (e.g. window.__seek(8))
   window.__seek = (s) => { clock = s; };
-
   setPalette();
   setBg();
   syncUI();
