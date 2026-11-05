@@ -271,6 +271,7 @@
       <option value="ig_portrait">Instagram portrait · 1080 × 1350</option>
       <option value="story">Story / Reels / TikTok · 1080 × 1920</option>
       <option value="fb">Facebook post · 1200 × 630</option>
+      <option value="fb_profile">Facebook profile · 720 × 720</option>
       <option value="x">X post · 1600 × 900</option>
       <option value="linkedin">LinkedIn post · 1200 × 627</option>
       <option value="yt">YouTube thumbnail · 1280 × 720</option>
@@ -892,7 +893,7 @@
   }
 
   // ---------- output size ----------
-  const SIZES = { ig_post: [1080, 1080], ig_portrait: [1080, 1350], story: [1080, 1920], fb: [1200, 630], x: [1600, 900],
+  const SIZES = { ig_post: [1080, 1080], ig_portrait: [1080, 1350], story: [1080, 1920], fb: [1200, 630], fb_profile: [720, 720], x: [1600, 900],
                   linkedin: [1200, 627], yt: [1280, 720], pin: [1000, 1500] };
   const clampPx = (v) => Math.round(Math.min(4096, Math.max(200, +v || 1080)));
   const outSize = () => S.size === 'custom' ? [clampPx(S.cw), clampPx(S.ch)] : SIZES[S.size] || null;
